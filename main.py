@@ -74,6 +74,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* ── Cards Glass ── */
 .card{ background:var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius:16px; overflow:hidden; margin-bottom:12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.card-section{padding:16px}
 
 /* ── Typography & Misc ── */
 .gpa-hero{ background:linear-gradient(160deg, rgba(10,132,255,0.1) 0%, rgba(0,0,0,0) 100%); border: 1px solid var(--glass-border); border-radius:20px; padding:24px 20px; margin-bottom:12px; text-align:center; }
@@ -96,7 +97,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .risk-strip{display:flex;align-items:center;gap:6px;background:rgba(255,69,58,0.15);padding:8px 16px;font-size:12px;color:#ff6b63;}
 
 .week-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px;} .week-btn{width:36px;height:36px;border-radius:10px;background:var(--bg3);border:1px solid var(--glass-border);color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;} .week-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--text2)}
-.day-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;} .day-tab{flex-shrink:0;padding:7px 14px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:99px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;} .day-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.day-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;} 
+.day-tab{flex-shrink:0;padding:8px 12px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:16px;color:var(--text3);cursor:pointer; display:flex; flex-direction:column; align-items:center; min-width:48px;} 
+.day-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .lesson-row{display:flex;gap:12px;padding:14px 16px;} .lesson-num-wrap{width:36px;display:flex;flex-direction:column;align-items:center;gap:2px;} .lesson-num-circle{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;} .lesson-body{flex:1} .lesson-subject{font-size:14px;font-weight:600;margin-bottom:5px;}
 
 .nav-tabs-row{display:flex;gap:8px;margin-bottom:14px} .nav-seg-btn{flex:1;padding:11px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:12px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;} .nav-seg-btn.active{background:rgba(10,132,255,0.2);border-color:var(--accent);color:var(--accent);}
@@ -257,11 +260,24 @@ function renderGrades(c) {
 }
 
 function renderTimetable(c) {
-  // XATONI TUZATILGAN JOYI: Array length: 7 (Dushanbadan Yakshanbagacha)
-  const mon = monday(S.curWeekOff); const days = Array.from({length:7}, (_,i) => { const d=new Date(mon); d.setDate(d.getDate()+i); return {i, iso:isoDate(d), short:DAYS_UZ[i]}; });
+  const mon = monday(S.curWeekOff); 
+  const endD = new Date(mon); endD.setDate(endD.getDate() + 6);
+  const fmt = d => String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
+  const weekStr = fmt(mon) + ' - ' + fmt(endD) + ' · ' + mon.getFullYear();
+
+  const days = Array.from({length:7}, (_,i) => { 
+      const d = new Date(mon); d.setDate(d.getDate()+i); 
+      return {i, iso:isoDate(d), short:DAYS_UZ[i], num: d.getDate()}; 
+  });
+  
   c.innerHTML = `
-    <div class="week-nav"><button class="week-btn" id="pw">‹</button><div class="week-label">Jadval · ${mon.getFullYear()}</div><button class="week-btn" id="nw">›</button></div>
-    <div class="day-tabs">${days.map(d => `<button class="day-tab ${d.i===S.curDayIdx?'active':''}" onclick="haptic(); S.curDayIdx=${d.i}; navigate('timetable')">${d.short}</button>`).join('')}</div>
+    <div class="week-nav"><button class="week-btn" id="pw">‹</button><div class="week-label">${weekStr}</div><button class="week-btn" id="nw">›</button></div>
+    <div class="day-tabs">${days.map(d => `
+      <button class="day-tab ${d.i===S.curDayIdx?'active':''}" onclick="haptic(); S.curDayIdx=${d.i}; navigate('timetable')">
+        <span style="font-size:10px;font-weight:500;opacity:0.8;margin-bottom:2px">${d.short}</span>
+        <span style="font-size:15px;font-weight:700">${d.num}</span>
+      </button>`).join('')}
+    </div>
     <div class="card">${(DEMO.timetable[days[S.curDayIdx].iso]||[]).map((l,i) => `
       <div class="lesson-row" style="${i>0?'border-top:1px solid var(--glass-border)':''}">
         <div class="lesson-num-wrap"><div class="lesson-num-circle" style="background:${COLORS[i]}22;color:${COLORS[i]}">${l.num}</div></div>
