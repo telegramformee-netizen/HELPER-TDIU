@@ -1,5 +1,5 @@
 """
-main.py - HELPER TDIU — FastAPI + aiogram bot
+main.py - HELPER TDIU v3.0 — Maximum version
 """
 import asyncio
 from contextlib import asynccontextmanager
@@ -8,9 +8,6 @@ from fastapi.responses import HTMLResponse
 import config
 from database import init_db
 
-# ══════════════════════════════════════════════════════════════
-# MINI APP HTML — iOS 18 PRO VERSION (Soddalashtirilgan)
-# ══════════════════════════════════════════════════════════════
 MINI_APP_HTML = r"""<!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -18,181 +15,931 @@ MINI_APP_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>HELPER · TDIU</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #000000; --text: #ffffff; --text2: rgba(235,235,245,0.8); --text3: rgba(235,235,245,0.6); --text4: rgba(235,235,245,0.4);
-  --accent: #0a84ff; --green: #30d158; --orange: #ff9f0a; --red: #ff453a; --purple: #bf5af2;
-  --card-bg: rgba(28, 28, 30, 0.6); --glass-border: rgba(255, 255, 255, 0.1);
-  --nav-h: 83px; --top-h: 60px;
+  --bg:#000;--bg2:#111114;--bg3:#1c1c1e;--bg4:#2c2c2e;--bg5:#3a3a3c;
+  --text:#fff;--t2:rgba(235,235,245,.85);--t3:rgba(235,235,245,.6);--t4:rgba(235,235,245,.35);
+  --accent:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--purple:#bf5af2;--pink:#ff375f;
+  --sep:rgba(255,255,255,.09);
+  --nav:83px;--top:60px;
+  --safe-b:env(safe-area-inset-bottom,0px);
 }
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); overflow:hidden; height:100vh; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  -webkit-font-smoothing:antialiased}
 
-.bg-blobs { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; filter:blur(80px); opacity:0.3; }
-.blob { position:absolute; border-radius:50%; animation:float 20s infinite alternate ease-in-out; }
-.blob-1 { width:300px; height:300px; background:#0a84ff; top:-10%; left:-10%; }
-.blob-2 { width:400px; height:400px; background:#bf5af2; bottom:-20%; right:-10%; }
-@keyframes float { 0% { transform:translate(0,0); } 100% { transform:translate(40px,40px); } }
+/* BG */
+.bg-wrap{position:fixed;inset:0;z-index:0;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.18;animation:blob-move 18s infinite alternate ease-in-out}
+.b1{width:380px;height:380px;background:#0a84ff;top:-15%;left:-15%;animation-delay:0s}
+.b2{width:460px;height:460px;background:#bf5af2;bottom:-20%;right:-15%;animation-delay:-6s}
+.b3{width:300px;height:300px;background:#30d158;top:40%;left:30%;animation-delay:-12s;opacity:.1}
+@keyframes blob-move{0%{transform:translate(0,0) scale(1)}100%{transform:translate(30px,25px) scale(1.08)}}
 
-.topbar { position:fixed; top:0; width:100%; height:var(--top-h); background:rgba(0,0,0,0.7); backdrop-filter:blur(25px); border-bottom:1px solid var(--glass-border); display:flex; align-items:center; padding:0 20px; z-index:100; }
-.topbar-logo { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#0a84ff,#5e5ce6); display:flex; align-items:center; justify-content:center; font-weight:800; margin-right:12px; }
+/* TOPBAR */
+.topbar{
+  position:fixed;top:0;left:0;right:0;height:var(--top);
+  background:rgba(0,0,0,.75);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border-bottom:.5px solid var(--sep);
+  display:flex;align-items:center;padding:0 18px;z-index:200;
+}
+.tlogo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#0a84ff 0%,#5e5ce6 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:900;color:#fff;margin-right:12px;
+  box-shadow:0 2px 12px rgba(10,132,255,.45);
+  flex-shrink:0;
+}
+.tname{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.tsub{font-size:11px;color:var(--t3);margin-top:1px}
+.tright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tbadge{
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;
+  letter-spacing:.3px;
+}
+.pro-badge{background:linear-gradient(135deg,#ff9f0a,#ff6b00);color:#fff}
+.demo-badge{background:var(--bg4);color:var(--t3);border:.5px solid var(--sep)}
+.tgpa{font-size:15px;font-weight:800;color:var(--accent)}
 
-.view { position:fixed; top:var(--top-h); bottom:var(--nav-h); width:100%; overflow-y:auto; padding:15px; opacity:0; transform:translateX(20px); transition:0.3s cubic-bezier(0.2,1,0.3,1); pointer-events:none; }
-.view.active { opacity:1; transform:translateX(0); pointer-events:auto; }
+/* VIEWS */
+.view{
+  position:fixed;top:var(--top);left:0;right:0;
+  bottom:var(--nav);
+  overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  opacity:0;transform:translateX(28px);
+  transition:opacity .28s ease,transform .28s cubic-bezier(.25,.46,.45,.94);
+  pointer-events:none;z-index:1;
+}
+.view::-webkit-scrollbar{display:none}
+.view.active{opacity:1;transform:none;pointer-events:auto}
+.view.left{transform:translateX(-28px)}
+.vpad{padding:14px 16px 24px}
 
-.card { background:var(--card-bg); backdrop-filter:blur(20px); border:1px solid var(--glass-border); border-radius:18px; padding:18px; margin-bottom:12px; }
+/* NAV */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--nav) + var(--safe-b));
+  padding-bottom:var(--safe-b);
+  background:rgba(0,0,0,.8);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border-top:.5px solid var(--sep);
+  display:flex;align-items:flex-start;padding-top:11px;z-index:200;
+}
+.ni{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;cursor:pointer;color:var(--t4);
+  transition:color .2s;font-family:'Inter',sans-serif;
+  position:relative;
+}
+.ni.active{color:var(--accent)}
+.ni.active::before{
+  content:'';position:absolute;top:-11px;left:25%;right:25%;
+  height:2.5px;background:var(--accent);border-radius:0 0 3px 3px;
+}
+.ni-icon{font-size:23px;line-height:1}
+.ni-lbl{font-size:10px;font-weight:500}
 
-.day-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:15px; scrollbar-width:none; }
-.day-tab { flex-shrink:0; width:52px; height:70px; background:var(--card-bg); border:1px solid var(--glass-border); border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text3); cursor:pointer; }
-.day-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 0 15px rgba(10,132,255,0.4); }
-.day-name { font-size:11px; font-weight:500; text-transform:uppercase; margin-bottom:4px; }
-.day-num { font-size:18px; font-weight:700; }
+/* CARDS */
+.card{
+  background:rgba(28,28,30,.65);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:.5px solid var(--sep);border-radius:18px;
+  margin-bottom:12px;overflow:hidden;
+}
+.cpd{padding:16px}
+.ctitle{font-size:12px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
+.csep{height:.5px;background:var(--sep)}
 
-.bottom-nav { position:fixed; bottom:0; width:100%; height:var(--nav-h); background:rgba(0,0,0,0.8); backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; padding-top:10px; }
-.nav-item { flex:1; display:flex; flex-direction:column; align-items:center; color:var(--text4); cursor:pointer; transition:0.2s; }
-.nav-item.active { color:var(--accent); }
-.nav-icon { font-size:24px; margin-bottom:4px; }
-.nav-label { font-size:10px; font-weight:500; }
+/* GPA HERO */
+.gpa-hero{
+  background:linear-gradient(160deg,rgba(10,132,255,.15) 0%,rgba(94,92,230,.12) 50%,transparent 100%);
+  border:.5px solid rgba(10,132,255,.25);border-radius:22px;
+  padding:24px 20px;margin-bottom:12px;position:relative;overflow:hidden;
+}
+.gpa-hero::after{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:180px;height:180px;
+  background:radial-gradient(circle,rgba(10,132,255,.15) 0%,transparent 70%);
+}
+.gpa-lbl{font-size:11px;font-weight:700;color:var(--accent);
+  text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}
+.gpa-val{
+  font-size:68px;font-weight:900;letter-spacing:-3px;line-height:1;
+  background:linear-gradient(135deg,#0a84ff,#5e5ce6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:6px;
+}
+.gpa-meta{font-size:13px;color:var(--t3)}
+.gpa-name{font-size:15px;font-weight:600;margin-top:12px;color:var(--text)}
 
-.lock-card { background:rgba(10,132,255,0.1); border:1px solid var(--accent); border-radius:18px; padding:20px; text-align:center; margin-bottom:12px; }
-.btn-pro { width:100%; background:var(--accent); color:#fff; border:none; padding:14px; border-radius:12px; font-weight:600; margin-top:12px; cursor:pointer; }
+/* STATS */
+.stats-row{display:flex;gap:10px;margin-bottom:12px}
+.stat-c{
+  flex:1;background:rgba(28,28,30,.65);
+  backdrop-filter:blur(20px);border:.5px solid var(--sep);
+  border-radius:18px;padding:14px 12px;
+}
+.sv{font-size:30px;font-weight:800;line-height:1;margin-bottom:5px}
+.sl{font-size:11px;color:var(--t3);font-weight:500}
+.ss{font-size:10px;color:var(--t4);margin-top:2px}
 
-#toasts { position:fixed; bottom:100px; left:20px; right:20px; z-index:1000; }
-.toast { background:rgba(40,40,40,0.9); padding:12px 20px; border-radius:12px; font-size:14px; margin-top:8px; animation:slideUp 0.3s; }
-@keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+/* ALERTS */
+.alert{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:13px 15px;border-radius:14px;margin-bottom:9px;
+  font-size:13px;line-height:1.5;
+}
+.ai{font-size:18px;flex-shrink:0;margin-top:1px}
+.alert.danger{background:rgba(255,69,58,.1);border:.5px solid rgba(255,69,58,.3)}
+.alert.warn{background:rgba(255,159,10,.1);border:.5px solid rgba(255,159,10,.3)}
+.alert.info{background:rgba(10,132,255,.1);border:.5px solid rgba(10,132,255,.2)}
+.alert.success{background:rgba(48,209,88,.1);border:.5px solid rgba(48,209,88,.25)}
+
+/* LESSON CHIPS */
+.chips{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;background:rgba(44,44,46,.7);
+  backdrop-filter:blur(12px);border:.5px solid var(--sep);
+  border-radius:16px;padding:13px 15px;min-width:155px;
+}
+.chip-n{font-size:10px;font-weight:700;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.chip-t{font-size:12px;color:var(--t3);margin-bottom:7px}
+.chip-s{font-size:14px;font-weight:600;line-height:1.3;margin-bottom:5px}
+.chip-r{font-size:11px;color:var(--t4)}
+
+/* SECTION */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:11px;margin-top:6px}
+.sec-t{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.sec-m{font-size:14px;color:var(--accent);font-weight:500;cursor:pointer}
+
+/* GRADE CARD */
+.grade-wrap{position:relative;padding:15px 16px}
+.g-name{font-size:15px;font-weight:600;line-height:1.3;padding-right:62px;margin-bottom:3px}
+.g-meta{font-size:12px;color:var(--t3);margin-bottom:12px}
+.g-total{position:absolute;top:15px;right:16px;font-size:24px;font-weight:800}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar-r{display:flex;align-items:center;gap:9px}
+.bar-l{font-size:11px;color:var(--t4);width:46px;flex-shrink:0;font-weight:500}
+.bar-t{flex:1;height:4px;background:var(--bg5);border-radius:99px;overflow:hidden}
+.bar-f{height:100%;border-radius:99px;transition:width .8s cubic-bezier(.34,1.56,.64,1)}
+.bar-v{font-size:11px;color:var(--t3);width:34px;text-align:right;flex-shrink:0}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px}
+.t-blue{background:rgba(10,132,255,.15);color:var(--accent)}
+.t-green{background:rgba(48,209,88,.15);color:var(--green)}
+.t-orange{background:rgba(255,159,10,.15);color:var(--orange)}
+.t-red{background:rgba(255,69,58,.15);color:var(--red)}
+.t-gray{background:var(--bg4);color:var(--t3)}
+.t-purple{background:rgba(191,90,242,.15);color:var(--purple)}
+.risk-strip{display:flex;align-items:center;gap:7px;
+  background:rgba(255,69,58,.08);border-top:.5px solid rgba(255,69,58,.15);
+  padding:9px 16px;font-size:12px;color:#ff6b63}
+.nb-strip{display:flex;align-items:center;gap:7px;
+  background:rgba(255,159,10,.08);border-top:.5px solid rgba(255,159,10,.15);
+  padding:9px 16px;font-size:12px;color:var(--orange)}
+
+/* GPA PROGRESS RING */
+.ring-wrap{display:flex;justify-content:center;align-items:center;margin:8px 0}
+.ring{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--bg5);stroke-width:8}
+.ring-fg{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;
+  transition:stroke-dashoffset 1.2s cubic-bezier(.34,1.56,.64,1);stroke-dasharray:283;stroke-dashoffset:283}
+.ring-text{position:absolute;font-size:26px;font-weight:800;color:var(--accent)}
+
+/* TIMETABLE */
+.week-nav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.wbtn{
+  width:38px;height:38px;border-radius:11px;
+  background:var(--bg3);border:none;cursor:pointer;color:var(--text);
+  font-size:18px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:background .15s;
+}
+.wbtn:active{background:var(--bg4)}
+.wlbl{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--t2)}
+.dtabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;
+  margin-bottom:14px;scrollbar-width:none}
+.dtabs::-webkit-scrollbar{display:none}
+.dtab{
+  flex-shrink:0;padding:8px 15px;
+  background:var(--bg3);border:none;border-radius:99px;
+  font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;
+  transition:all .15s;font-family:'Inter',sans-serif;
+  position:relative;
+}
+.dtab.active{background:var(--accent);color:#fff;box-shadow:0 0 14px rgba(10,132,255,.4)}
+.dtab.today:not(.active){border:.5px solid var(--accent);color:var(--accent);background:rgba(10,132,255,.1)}
+.dtab .dot{
+  position:absolute;top:2px;right:4px;
+  width:5px;height:5px;border-radius:50%;background:var(--accent);
+}
+.dtab.active .dot{background:#fff}
+.lrow{display:flex;gap:12px;align-items:flex-start;padding:14px 16px}
+.lnum-col{width:38px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px}
+.lnum{width:34px;height:34px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700}
+.ltmini{font-size:9px;color:var(--t4);text-align:center;line-height:1.4}
+.lbody{flex:1}
+.lsubj{font-size:14px;font-weight:600;margin-bottom:6px;line-height:1.3}
+.lmeta{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--t3)}
+.lmi{display:flex;align-items:center;gap:3px}
+.no-lesson{text-align:center;padding:50px 20px;color:var(--t4)}
+.no-lesson-ic{font-size:56px;margin-bottom:14px}
+.no-lesson-t{font-size:16px;font-weight:600;color:var(--t3)}
+.no-lesson-s{font-size:13px;margin-top:5px}
+
+/* NAVIGATOR */
+.nav-segs{display:flex;gap:8px;margin-bottom:14px}
+.nseg{
+  flex:1;padding:11px;background:var(--bg3);
+  border:.5px solid transparent;border-radius:13px;
+  font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;
+  transition:all .15s;font-family:'Inter',sans-serif;
+}
+.nseg.active{background:rgba(10,132,255,.12);border-color:var(--accent);color:var(--accent)}
+.search-b{
+  display:flex;align-items:center;gap:10px;
+  background:var(--bg3);border-radius:13px;
+  padding:12px 14px;margin-bottom:12px;
+  border:.5px solid var(--sep);transition:border-color .2s;
+}
+.search-b:focus-within{border-color:var(--accent)}
+.si{font-size:16px;color:var(--t4)}
+.sinput{
+  background:none;border:none;outline:none;
+  color:var(--text);font-size:14px;flex:1;
+  font-family:'Inter',sans-serif;
+}
+.sinput::placeholder{color:var(--t4)}
+.room-r{display:flex;align-items:center;gap:14px;padding:13px 16px}
+.rcode{font-size:16px;font-weight:700;color:var(--accent);width:58px;flex-shrink:0}
+.rinfo{flex:1}
+.rname{font-size:14px;font-weight:500}
+.rmeta{font-size:12px;color:var(--t3);margin-top:2px}
+.rtag{background:var(--bg4);color:var(--t3);font-size:10px;font-weight:600;padding:3px 8px;border-radius:7px}
+.teacher-r{display:flex;align-items:center;gap:14px;padding:13px 16px}
+.tav{
+  width:44px;height:44px;border-radius:13px;
+  background:linear-gradient(135deg,var(--bg3),var(--bg4));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;flex-shrink:0;color:var(--accent);
+}
+.tloc-on{color:var(--green);font-size:12px;margin-top:4px;display:flex;align-items:center;gap:4px}
+.tloc-off{color:var(--t4);font-size:12px;margin-top:4px}
+
+/* PREMIUM LOCK */
+.lock-card{
+  background:linear-gradient(160deg,rgba(10,132,255,.12),rgba(94,92,230,.08));
+  border:.5px solid rgba(10,132,255,.25);border-radius:20px;
+  padding:26px 20px;text-align:center;margin-bottom:12px;
+}
+.lock-ic{font-size:44px;margin-bottom:14px}
+.lock-t{font-size:19px;font-weight:700;margin-bottom:9px}
+.lock-d{font-size:13px;color:var(--t3);line-height:1.6;margin-bottom:18px}
+.lock-features{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;text-align:left}
+.lf-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.lf-ic{width:28px;height:28px;border-radius:8px;
+  background:rgba(10,132,255,.15);display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0}
+.btn-primary{
+  display:block;width:100%;background:var(--accent);color:#fff;
+  font-family:'Inter',sans-serif;font-size:15px;font-weight:700;
+  padding:15px;border:none;border-radius:13px;cursor:pointer;
+  transition:opacity .15s;letter-spacing:-.1px;
+}
+.btn-primary:active{opacity:.8}
+.btn-outline{
+  display:block;width:100%;background:transparent;color:var(--accent);
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+  padding:12px;border:.5px solid var(--accent);border-radius:13px;
+  cursor:pointer;margin-top:10px;
+}
+
+/* PROGRESS CIRCLE */
+.pcircle{
+  display:inline-flex;position:relative;
+  align-items:center;justify-content:center;
+  width:100px;height:100px;
+}
+.pcircle svg{position:absolute;transform:rotate(-90deg)}
+.pcircle .pval{font-size:22px;font-weight:800}
+
+/* ATTENDANCE BAR */
+.att-row{display:flex;align-items:center;gap:12px;margin-top:4px}
+.att-t{width:70px;font-size:11px;color:var(--t4);flex-shrink:0}
+.att-bar{flex:1;height:5px;background:var(--bg5);border-radius:99px;overflow:hidden}
+.att-fill{height:100%;border-radius:99px}
+.att-pct{font-size:11px;color:var(--t3);width:36px;text-align:right;flex-shrink:0}
+
+/* TOAST */
+#toasts{
+  position:fixed;bottom:calc(var(--nav) + 14px);
+  left:16px;right:16px;z-index:999;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast-el{
+  background:rgba(44,44,46,.95);
+  backdrop-filter:blur(20px);border:.5px solid var(--sep);
+  border-radius:14px;padding:13px 16px;
+  font-size:13px;display:flex;align-items:center;gap:10px;
+  pointer-events:all;
+  animation:tIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+.toast-el.out{animation:tOut .25s ease forwards}
+@keyframes tIn{from{opacity:0;transform:translateY(12px) scale(.95)}to{opacity:1;transform:none}}
+@keyframes tOut{to{opacity:0;transform:translateY(8px)}}
+
+/* SKEL */
+.skel{
+  background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);
+  background-size:200% 100%;animation:sk 1.3s infinite;border-radius:12px;
+}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body>
-<div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
-
-<header class="topbar">
-  <div class="topbar-logo">H</div>
-  <div><div style="font-weight:700; font-size:15px;">HELPER TDIU</div><div id="top-sub" style="font-size:11px; color:var(--text3);">Yuklanmoqda...</div></div>
-  <div style="margin-left:auto;"><div class="badge-demo" style="background:var(--bg4); font-size:10px; padding:3px 8px; border-radius:20px; color:var(--text3); border:1px solid var(--glass-border);">DEMO</div></div>
-</header>
-
-<div id="view-container">
-  <div id="home" class="view"></div>
-  <div id="grades" class="view"></div>
-  <div id="timetable" class="view"></div>
-  <div id="navigator" class="view"></div>
+<div class="bg-wrap" aria-hidden="true">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
 </div>
 
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="tlogo">H</div>
+  <div>
+    <div class="tname">HELPER TDIU</div>
+    <div class="tsub" id="tsub">Yuklanmoqda…</div>
+  </div>
+  <div class="tright">
+    <div id="tgpa" class="tgpa" style="display:none"></div>
+    <div id="badge-pro"  class="tbadge pro-badge"  style="display:none">👑 PRO</div>
+    <div id="badge-demo" class="tbadge demo-badge" style="display:none">DEMO</div>
+  </div>
+</header>
+
+<!-- VIEWS -->
+<div id="v-home"      class="view active"><div class="vpad" id="home-inner"></div></div>
+<div id="v-grades"    class="view"><div class="vpad" id="grades-inner"></div></div>
+<div id="v-timetable" class="view"><div class="vpad" id="tt-inner"></div></div>
+<div id="v-navigator" class="view"><div class="vpad" id="nav-inner"></div></div>
+
+<!-- BOTTOM NAV -->
 <nav class="bottom-nav">
-  <div class="nav-item active" onclick="show('home')"><div class="nav-icon">🏠</div><div class="nav-label">Bosh</div></div>
-  <div class="nav-item" onclick="show('grades')"><div class="nav-icon">📊</div><div class="nav-label">Baholar</div></div>
-  <div class="nav-item" onclick="show('timetable')"><div class="nav-icon">📅</div><div class="nav-label">Jadval</div></div>
-  <div class="nav-item" onclick="show('navigator')"><div class="nav-icon">🗺️</div><div class="nav-label">Navi</div></div>
+  <button class="ni active" id="ni-home" onclick="go('home')">
+    <span class="ni-icon">🏠</span><span class="ni-lbl">Bosh</span>
+  </button>
+  <button class="ni" id="ni-grades" onclick="go('grades')">
+    <span class="ni-icon">📊</span><span class="ni-lbl">Baholar</span>
+  </button>
+  <button class="ni" id="ni-timetable" onclick="go('timetable')">
+    <span class="ni-icon">📅</span><span class="ni-lbl">Jadval</span>
+  </button>
+  <button class="ni" id="ni-navigator" onclick="go('navigator')">
+    <span class="ni-icon">🗺️</span><span class="ni-lbl">Navigator</span>
+  </button>
 </nav>
 
 <div id="toasts"></div>
 
 <script>
-const tg = window.Telegram?.WebApp; tg?.expand();
-const DATA = {
-  profile: { gpa: 3.45, group: "IQ-22-01", sem: "2024-2" },
-  grades: [
-    {s:"Mikroiqtisodiyot", tot:41, cur:17, mid:24, r:false, nb:false},
-    {s:"Pul va kredit", tot:30, cur:12, mid:18, r:true, nb:true, need:25},
-    {s:"Bank ishi va kredit", tot:37, cur:15, mid:22, r:false, nb:true}
-  ],
-  timetable: { "2025-04-07": [{n:1, t:"08:30", s:"Matematika", r:"A-301"}] }
+// ─── Telegram ──────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+tg?.expand();
+tg?.disableVerticalSwipes?.();
+
+// ─── State ────────────────────────────────────────────────────
+const S = {
+  view:'home', prev:'home',
+  isPremium:false, isDemo:true,
+  weekOff:0,
+  dayIdx: new Date().getDay()===0 ? 6 : new Date().getDay()-1,
+  navTab:'rooms',
 };
 
-function toast(m) { const t=document.getElementById('toasts'); const e=document.createElement('div'); e.className='toast'; e.innerHTML="✅ "+m; t.appendChild(e); setTimeout(()=>e.remove(),3000); }
+// ─── Demo Data ────────────────────────────────────────────────
+const D = {
+  profile:{name:"Ulug'bek Toshmatov",group:"IQ-22-01",faculty:"Iqtisodiyot",sem:"2024-2",gpa:3.45},
+  grades:[
+    {s:"Mikroiqtisodiyot",       cur:17,mid:24,fin:null,tot:41,hrs:64,miss:4, risk:false,nb:false,need:14},
+    {s:"Bank ishi va kredit",    cur:15,mid:22,fin:null,tot:37,hrs:72,miss:15,risk:false,nb:true, need:18},
+    {s:"Iqtisodiy siyosat",      cur:18,mid:28,fin:null,tot:46,hrs:80,miss:2, risk:false,nb:false,need:9},
+    {s:"Pul va kredit",          cur:12,mid:18,fin:null,tot:30,hrs:64,miss:14,risk:true, nb:true, need:25},
+    {s:"Marketing asoslari",     cur:19,mid:26,fin:null,tot:45,hrs:72,miss:0, risk:false,nb:false,need:10},
+    {s:"Tadbirkorlik asoslari",  cur:16,mid:25,fin:null,tot:41,hrs:56,miss:6, risk:false,nb:false,need:14},
+  ],
+  tt:{
+    "2025-04-07":[
+      {n:1,st:"08:30",en:"09:50",s:"Mikroiqtisodiyot",tp:"Ma'ruza",   tc:"Salimov B.",  r:"A-301",b:"A blok"},
+      {n:3,st:"11:30",en:"12:50",s:"Bank ishi",        tp:"Seminar",   tc:"Rahimov N.",  r:"B-204",b:"B blok"},
+    ],
+    "2025-04-08":[
+      {n:2,st:"10:00",en:"11:20",s:"Pul va kredit",    tp:"Ma'ruza",   tc:"Hasanov M.",  r:"A-101",b:"A blok"},
+      {n:4,st:"13:30",en:"14:50",s:"Marketing",        tp:"Seminar",   tc:"Yusupov K.",  r:"C-305",b:"C blok"},
+    ],
+    "2025-04-09":[
+      {n:1,st:"08:30",en:"09:50",s:"Iqtisodiy siyosat",tp:"Ma'ruza",  tc:"Toshmatov A.",r:"A-201",b:"A blok"},
+      {n:5,st:"15:00",en:"16:20",s:"Tadbirkorlik",     tp:"Seminar",   tc:"Aliyev R.",   r:"B-101",b:"B blok"},
+    ],
+    "2025-04-10":[
+      {n:2,st:"10:00",en:"11:20",s:"Mikroiqtisodiyot", tp:"Seminar",  tc:"Salimov B.",  r:"B-102",b:"B blok"},
+    ],
+    "2025-04-11":[
+      {n:3,st:"11:30",en:"12:50",s:"Marketing",        tp:"Ma'ruza",   tc:"Yusupov K.",  r:"A-301",b:"A blok"},
+      {n:6,st:"16:30",en:"17:50",s:"Bank ishi",        tp:"Ma'ruza",   tc:"Rahimov N.",  r:"A-101",b:"A blok"},
+    ],
+  },
+  rooms:[
+    {c:"A-101",b:"A blok",f:1,cap:120,t:"Ma'ruza zali"},
+    {c:"A-102",b:"A blok",f:1,cap:60, t:"Seminar xona"},
+    {c:"A-201",b:"A blok",f:2,cap:80, t:"Ma'ruza zali"},
+    {c:"A-301",b:"A blok",f:3,cap:100,t:"Ma'ruza zali"},
+    {c:"A-305",b:"A blok",f:3,cap:40, t:"Kompyuter lab"},
+    {c:"B-101",b:"B blok",f:1,cap:50, t:"Seminar xona"},
+    {c:"B-102",b:"B blok",f:1,cap:50, t:"Seminar xona"},
+    {c:"B-204",b:"B blok",f:2,cap:30, t:"Seminar xona"},
+    {c:"C-101",b:"C blok",f:1,cap:40, t:"Kompyuter lab"},
+    {c:"C-305",b:"C blok",f:3,cap:30, t:"Seminar xona"},
+    {c:"AKTOV",b:"Asosiy",f:1,cap:500,t:"Aktov zal"},
+  ],
+  teachers:[
+    {n:"Salimov B.A.",  d:"Mikroiqtisodiyot",  r:"A-301",online:true},
+    {n:"Rahimov N.X.",  d:"Bank ishi",         r:"B-204",online:true},
+    {n:"Hasanov M.T.",  d:"Pul va kredit",     r:null,   online:false},
+    {n:"Yusupov K.O.",  d:"Marketing",         r:"C-305",online:true},
+    {n:"Toshmatov A.R.",d:"Iqtisodiy siyosat", r:null,   online:false},
+    {n:"Aliyev R.S.",   d:"Tadbirkorlik",      r:"B-101",online:true},
+  ],
+};
 
-function show(v) {
-  tg?.HapticFeedback?.impactOccurred('light');
-  document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach((e,i) => e.classList.toggle('active', ['home','grades','timetable','navigator'][i]===v));
-  const el = document.getElementById(v); el.classList.add('active');
-  if(v==='home') renderHome(); if(v==='grades') renderGrades(); if(v==='timetable') renderTable(); if(v==='navigator') renderNav();
+// ─── Helpers ──────────────────────────────────────────────────
+const DU = ["Du","Se","Ch","Pa","Ju","Sh","Ya"];
+const DF = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"];
+const CL = ["#0a84ff","#30d158","#ff9f0a","#bf5af2","#ff453a","#5e5ce6","#32ade6"];
+
+function iso(d){ return d.toISOString().slice(0,10); }
+function today(){ return iso(new Date()); }
+function monday(off=0){
+  const d=new Date(); const wd=d.getDay()===0?6:d.getDay()-1;
+  d.setDate(d.getDate()-wd+off*7); d.setHours(0,0,0,0); return d;
+}
+function fmt(d){ return d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0'); }
+
+function toast(msg,type='info'){
+  const icons={info:'ℹ️',success:'✅',warn:'⚠️',error:'❌'};
+  const el=document.createElement('div');
+  el.className='toast-el';
+  el.innerHTML='<span>'+icons[type]+'</span><span>'+msg+'</span>';
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.classList.add('out'); el.addEventListener('animationend',()=>el.remove()); },3000);
+}
+function haptic(t='light'){ tg?.HapticFeedback?.impactOccurred(t); }
+
+function letter(t){
+  if(t===null) return null;
+  return t>=86?'A':t>=71?'B':t>=55?'C':'D';
+}
+function totalColor(t){
+  return t>=86?'var(--green)':t>=71?'var(--accent)':t>=55?'var(--orange)':'var(--red)';
 }
 
-function renderHome() {
-  const p = DATA.profile;
-  const risks = DATA.grades.filter(g => g.r).length;
-  const nbs = DATA.grades.filter(g => g.nb).length;
+// ─── Navigation ───────────────────────────────────────────────
+const ORDER = ['home','grades','timetable','navigator'];
+function go(v){
+  if(v===S.view) return;
+  const pi = ORDER.indexOf(S.view), ni = ORDER.indexOf(v);
+  const going_right = ni > pi;
+  document.getElementById('v-'+S.view).classList.toggle('left', going_right);
+  document.getElementById('v-'+S.view).classList.remove('active');
+  S.prev=S.view; S.view=v;
+  const el = document.getElementById('v-'+v);
+  el.classList.remove('left');
+  el.classList.add('active');
+  document.querySelectorAll('.ni').forEach(b => b.classList.toggle('active', b.id==='ni-'+v));
+  document.getElementById('v-'+v).querySelector('[id$="-inner"],[id$="inner"]').scrollTop=0;
+  render(v);
+  haptic('light');
+}
+
+function render(v){
+  if(v==='home')      renderHome();
+  else if(v==='grades')     renderGrades();
+  else if(v==='timetable')  renderTimetable();
+  else if(v==='navigator')  renderNavigator();
+}
+
+// ─── Topbar ───────────────────────────────────────────────────
+function initTopbar(){
+  const p=D.profile;
+  document.getElementById('tsub').textContent=p.group+' · '+p.faculty;
+  document.getElementById('tgpa').textContent=p.gpa.toFixed(2);
+  document.getElementById('tgpa').style.display='';
+  if(S.isPremium) document.getElementById('badge-pro').style.display='';
+  if(S.isDemo)    document.getElementById('badge-demo').style.display='';
+}
+
+// ══════════════════════════════════════════════════════
+// HOME
+// ══════════════════════════════════════════════════════
+function renderHome(){
+  const p=D.profile;
+  const risks = D.grades.filter(g=>g.risk).length;
+  const nbs   = D.grades.filter(g=>g.nb).length;
+  const td    = D.tt[today()]||[];
+  const gpaLabel = p.gpa>=3.7?"A'lo":p.gpa>=3.0?"Yaxshi":p.gpa>=2.0?"Qoniqarli":"Past";
 
   let html = `
-    <div style="background:linear-gradient(135deg, rgba(10,132,255,0.15), transparent); border:1px solid rgba(10,132,255,0.2); border-radius:18px; padding:20px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-       <div>
-          <div style="font-size:12px; color:var(--accent); font-weight:700; margin-bottom:4px; text-transform:uppercase;">Umumiy GPA</div>
-          <div style="font-size:42px; font-weight:800; line-height:1;">${p.gpa.toFixed(2)}</div>
-       </div>
-       <div style="font-size:14px; color:var(--text3); font-weight:500;">${p.sem}</div>
-    </div>
-  `;
+  <div class="gpa-hero">
+    <div class="gpa-lbl">Umumiy GPA</div>
+    <div class="gpa-val">${p.gpa.toFixed(2)}</div>
+    <div class="gpa-meta">${p.sem} semester · ${gpaLabel}</div>
+    <div class="gpa-name">${p.name} · ${p.group}</div>
+  </div>
 
-  if (risks > 0 || nbs > 0) {
-     html += `<div style="display:flex; gap:10px; margin-bottom:12px;">`;
-     if (risks > 0) {
-        html += `
-          <div style="flex:1; background:rgba(255,69,58,0.15); border:1px solid rgba(255,69,58,0.3); border-radius:16px; padding:14px; display:flex; align-items:center; gap:12px;">
-             <div style="font-size:24px;">🚨</div>
-             <div><div style="color:var(--red); font-size:18px; font-weight:800; line-height:1;">${risks} ta</div><div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Qayta topshirish</div></div>
-          </div>`;
-     }
-     if (nbs > 0) {
-        html += `
-          <div style="flex:1; background:rgba(255,159,10,0.15); border:1px solid rgba(255,159,10,0.3); border-radius:16px; padding:14px; display:flex; align-items:center; gap:12px;">
-             <div style="font-size:24px;">📍</div>
-             <div><div style="color:var(--orange); font-size:18px; font-weight:800; line-height:1;">${nbs} ta</div><div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Davomat xavfi</div></div>
-          </div>`;
-     }
-     html += `</div>`;
+  <div class="stats-row">
+    <div class="stat-c">
+      <div class="sv" style="color:${risks>0?'var(--red)':'var(--green)'}">${risks}</div>
+      <div class="sl">Xavf ostida</div><div class="ss">fan</div>
+    </div>
+    <div class="stat-c">
+      <div class="sv" style="color:${nbs>0?'var(--orange)':'var(--green)'}">${nbs}</div>
+      <div class="sl">NB xavfi</div><div class="ss">fan</div>
+    </div>
+    <div class="stat-c">
+      <div class="sv" style="color:var(--accent)">${td.length}</div>
+      <div class="sl">Bugun</div><div class="ss">dars</div>
+    </div>
+  </div>`;
+
+  if(risks>0) html+=`<div class="alert danger"><span class="ai">🚨</span><div><b>${risks} ta fanda</b> qayta topshirish xavfi bor!</div></div>`;
+  if(nbs>0)   html+=`<div class="alert warn"><span class="ai">📍</span><div><b>${nbs} ta fanda</b> davomat chegarasiga yaqin!</div></div>`;
+  if(S.isDemo) html+=`<div class="alert info"><span class="ai">👀</span><div>Demo rejim — namunali ma'lumotlar.</div></div>`;
+
+  html += `<div class="sec-hdr"><div class="sec-t">Bugun</div><div class="sec-m" onclick="go('timetable')">Barchasi</div></div>`;
+
+  if(td.length===0){
+    html+=`<div class="card"><div class="cpd" style="text-align:center;padding:24px;color:var(--t4)">🎉 Bugun darslar yo'q!</div></div>`;
+  } else {
+    html+=`<div class="chips">`;
+    td.forEach((l,i)=>{
+      html+=`<div class="chip">
+        <div class="chip-n">${l.n}-dars</div>
+        <div class="chip-t">${l.st} – ${l.en}</div>
+        <div class="chip-s">${l.s}</div>
+        <div class="chip-r">📍 ${l.r} · 👤 ${l.tc}</div>
+      </div>`;
+    });
+    html+=`</div>`;
   }
 
-  html += `
-    <div class="card" style="margin-bottom:12px;">
-      <div style="font-size:14px; font-weight:700; margin-bottom:12px; color:var(--text2);">BUGUNGI DARSLAR</div>
-      <div style="color:var(--text4); font-size:13px; text-align:center; padding:10px;">Bugun dam olish kuni ✨</div>
+  const atRisk = D.grades.filter(g=>g.risk||g.nb);
+  if(atRisk.length>0){
+    html+=`<div class="sec-hdr" style="margin-top:8px"><div class="sec-t">Diqqat</div></div><div class="card">`;
+    atRisk.forEach((g,i,a)=>{
+      html+=`<div style="padding:13px 16px;${i<a.length-1?'border-bottom:.5px solid var(--sep)':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <div style="font-size:14px;font-weight:600;flex:1;padding-right:50px">${g.s}</div>
+          <div style="font-size:20px;font-weight:800;color:${g.risk?'var(--red)':'var(--orange)'}">${g.tot}</div>
+        </div>
+        ${g.risk?`<div style="font-size:12px;color:var(--red)">⚠️ O'tish uchun yakuniyda ${g.need}/50 kerak</div>`:''}
+        ${g.nb  ?`<div style="font-size:12px;color:var(--orange);margin-top:3px">📍 Davomat 20% chegarasiga yaqin</div>`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(!S.isPremium){
+    html+=`
+    <div class="lock-card" style="margin-top:8px">
+      <div class="lock-ic">👑</div>
+      <div class="lock-t">Premium ga o'ting</div>
+      <div class="lock-features">
+        <div class="lf-row"><div class="lf-ic">⚡</div><span>Darhol ball yangilanishi</span></div>
+        <div class="lf-row"><div class="lf-ic">🔔</div><span>Jadval o'zgarish ogohlantirishlari</span></div>
+        <div class="lf-row"><div class="lf-ic">📈</div><span>To'liq GPA analitika va prognoz</span></div>
+        <div class="lf-row"><div class="lf-ic">🗺️</div><span>O'qituvchi real-time tracker</span></div>
+      </div>
+      <button class="btn-primary" onclick="toast('Tez kunda ulash rejalashtirilgan!','info')">
+        👑 5,000 so'm / oy
+      </button>
+    </div>`;
+  }
+
+  document.getElementById('home-inner').innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════
+// GRADES
+// ══════════════════════════════════════════════════════
+function renderGrades(){
+  const grades=D.grades;
+  const total=grades.reduce((s,g)=>s+g.tot,0);
+  const gpa=(total/grades.length/25).toFixed(2);
+  const passed=grades.filter(g=>g.fin!==null&&g.tot>=55).length;
+
+  let html=`
+  <div class="card" style="margin-bottom:14px">
+    <div class="cpd" style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div class="ctitle" style="margin-bottom:4px">GPA</div>
+        <div style="font-size:42px;font-weight:900;letter-spacing:-1.5px;
+          background:linear-gradient(135deg,#0a84ff,#5e5ce6);
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent">${gpa}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="ctitle" style="margin-bottom:4px">Fanlar</div>
+        <div style="font-size:42px;font-weight:900">${grades.length}</div>
+      </div>
     </div>
+    <div class="csep"></div>
+    <div style="display:flex;gap:18px;padding:10px 16px;font-size:11px;color:var(--t3)">
+      <span><span style="color:var(--accent)">■</span> Joriy /20</span>
+      <span><span style="color:var(--purple)">■</span> Oraliq /30</span>
+      <span><span style="color:var(--green)">■</span> Yakuniy /50</span>
+    </div>
+  </div>`;
+
+  grades.forEach((g,i)=>{
+    const cp=g.cur!==null?(g.cur/20)*100:0;
+    const mp=g.mid!==null?(g.mid/30)*100:0;
+    const fp=g.fin!==null?(g.fin/50)*100:0;
+    const lt=letter(g.fin!==null?g.tot:null);
+    const attPct=g.hrs>0?Math.round((g.hrs-g.miss)/g.hrs*100):100;
+
+    html+=`
+    <div class="card" style="border-color:${g.risk?'rgba(255,69,58,.3)':g.nb?'rgba(255,159,10,.2)':'transparent'}">
+      <div class="grade-wrap">
+        <div class="g-name">${g.s}</div>
+        <div class="g-meta">${g.hrs} soat · ${g.miss} o'tkazildi · Davomat ${attPct}%</div>
+        <div class="g-total" style="color:${totalColor(g.tot)}">${g.tot}</div>
+        <div class="bars">
+          <div class="bar-r">
+            <div class="bar-l">Joriy</div>
+            <div class="bar-t"><div class="bar-f" style="width:${cp}%;background:var(--accent)"></div></div>
+            <div class="bar-v">${g.cur??'—'}/20</div>
+          </div>
+          <div class="bar-r">
+            <div class="bar-l">Oraliq</div>
+            <div class="bar-t"><div class="bar-f" style="width:${mp}%;background:var(--purple)"></div></div>
+            <div class="bar-v">${g.mid??'—'}/30</div>
+          </div>
+          <div class="bar-r">
+            <div class="bar-l">Yakuniy</div>
+            <div class="bar-t"><div class="bar-f" style="width:${fp}%;background:var(--green)"></div></div>
+            <div class="bar-v">${g.fin??'—'}/50</div>
+          </div>
+        </div>
+        <div class="att-row">
+          <div class="att-t">Davomat</div>
+          <div class="att-bar"><div class="att-fill" style="width:${attPct}%;background:${attPct>=80?'var(--green)':attPct>=60?'var(--orange)':'var(--red)'}"></div></div>
+          <div class="att-pct">${attPct}%</div>
+        </div>
+        <div class="tags">
+          ${lt?`<span class="tag ${lt==='A'?'t-green':lt==='B'?'t-blue':lt==='C'?'t-orange':'t-red'}">${lt}</span>`:''}
+          ${g.fin===null?'<span class="tag t-gray">Jarayon</span>':'<span class="tag t-gray">Yakunlangan</span>'}
+          ${S.isPremium&&g.need?`<span class="tag t-orange">Yakuniyda ${g.need}/50 kerak</span>`:''}
+          ${attPct<80?'<span class="tag t-red">NB xavf</span>':''}
+        </div>
+      </div>
+      ${g.risk?`<div class="risk-strip"><span>⚠️</span><span>O'tish uchun yakuniyda <b>${g.need}/50</b> kerak</span></div>`:''}
+      ${g.nb&&!g.risk?`<div class="nb-strip"><span>📍</span><span>Davomat 20% chegarasiga yaqin!</span></div>`:''}
+    </div>`;
+  });
+
+  if(!S.isPremium){
+    html+=`
     <div class="lock-card">
-      <div style="font-size:32px;">👑</div>
-      <div style="font-weight:700; margin-top:8px;">Premium Tracker</div>
-      <div style="font-size:12px; color:var(--text3); margin-top:5px;">O'qituvchilar qayerdaligini real-vaqtda ko'ring.</div>
-      <button class="btn-pro" onclick="toast('Tez kunda!')">PRO — 5,000 so'm</button>
-    </div>
-  `;
-  document.getElementById('home').innerHTML = html;
+      <div class="lock-ic">🔒</div>
+      <div class="lock-t">Premium Analitika</div>
+      <div class="lock-d">Maqsad ball hisob-kitobi, GPA prognozi, batafsil tahlil.</div>
+      <button class="btn-primary" onclick="toast('Tez kunda!','info')">👑 Premium — 5,000 so'm/oy</button>
+    </div>`;
+  }
+
+  document.getElementById('grades-inner').innerHTML=html;
 }
 
-function renderGrades() {
-  document.getElementById('grades').innerHTML = `
-    <div class="card" style="padding:10px;"><canvas id="chart" style="height:180px;"></canvas></div>
-    ${DATA.grades.map(g => `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center;"><div><div style="font-weight:600;">${g.s}</div><div style="font-size:11px; color:var(--text3);">J: ${g.cur} | O: ${g.mid}</div></div><div style="font-size:22px; font-weight:800; color:${g.r?'var(--red)':'var(--green)'}">${g.tot}</div></div>${g.r?`<div style="font-size:11px; color:var(--red); margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,69,58,0.2);">⚠️ Yakuniyda ${g.need}/50 ball kerak</div>`:''}</div>`).join('')}
-  `;
-  new Chart(document.getElementById('chart'), { type:'radar', data:{ labels:['M','P','B','S','I'], datasets:[{data:[41,30,45,38,42], backgroundColor:'rgba(10,132,255,0.2)', borderColor:'#0a84ff', borderWidth:2}] }, options:{ scales:{ r:{ ticks:{display:false}, grid:{color:'rgba(255,255,255,0.1)'} } }, plugins:{legend:{display:false}} } });
+// ══════════════════════════════════════════════════════
+// TIMETABLE
+// ══════════════════════════════════════════════════════
+function renderTimetable(){
+  const mon=monday(S.weekOff);
+  const todayIso=today();
+  const days=Array.from({length:6},(_,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const di=iso(d);
+    return {i,di,short:DU[i],isToday:di===todayIso,has:!!(D.tt[di]?.length)};
+  });
+  const endD=new Date(mon); endD.setDate(endD.getDate()+5);
+  const wlbl=fmt(mon)+' – '+fmt(endD)+' · '+mon.getFullYear();
+  const curDay=days[Math.min(S.dayIdx,days.length-1)];
+  const lessons=D.tt[curDay.di]||[];
+
+  let html=`
+  <div class="week-nav">
+    <button class="wbtn" onclick="changeWeek(-1)">‹</button>
+    <div class="wlbl">${wlbl}</div>
+    <button class="wbtn" onclick="changeWeek(1)">›</button>
+  </div>
+  <div class="dtabs">
+    ${days.map(d=>`
+      <button class="dtab ${d.i===S.dayIdx?'active':''} ${d.isToday&&d.i!==S.dayIdx?'today':''}"
+              onclick="selectDay(${d.i},'${d.di}')">
+        ${d.short}${d.has&&d.i!==S.dayIdx?'<span class="dot"></span>':''}
+      </button>`).join('')}
+  </div>
+  <div class="card" id="ll-card">`;
+
+  if(lessons.length===0){
+    html+=`<div class="no-lesson">
+      <div class="no-lesson-ic">🏖️</div>
+      <div class="no-lesson-t">Bu kuni darslar yo'q</div>
+      <div class="no-lesson-s">Dam oling!</div>
+    </div>`;
+  } else {
+    lessons.forEach((l,i)=>{
+      const cl=CL[i%CL.length];
+      html+=`<div class="lrow" style="${i>0?'border-top:.5px solid var(--sep)':''}">
+        <div class="lnum-col">
+          <div class="lnum" style="background:${cl}22;color:${cl}">${l.n}</div>
+          <div class="ltmini">${l.st}<br>${l.en}</div>
+        </div>
+        <div class="lbody">
+          <div class="lsubj">${l.s}</div>
+          <div class="lmeta">
+            <span class="lmi">📍 ${l.r}</span>
+            <span class="lmi">👤 ${l.tc}</span>
+            <span class="tag t-gray" style="font-size:10px">${l.tp}</span>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  html+=`</div>`;
+
+  const total=days.reduce((s,d)=>{const ls=D.tt[d.di];return s+(ls?ls.length:0);},0);
+  if(total>0){
+    html+=`<div class="card"><div class="cpd">
+      <div class="ctitle">Bu hafta</div>
+      <div style="display:flex;gap:10px">
+        <div class="stat-c" style="background:rgba(10,132,255,.1);border-color:rgba(10,132,255,.2)">
+          <div class="sv v-blue">${total}</div>
+          <div class="sl">Jami dars</div>
+        </div>
+        ${days.filter(d=>D.tt[d.di]?.length).map(d=>`
+          <div class="stat-c">
+            <div class="sv" style="font-size:18px">${D.tt[d.di].length}</div>
+            <div class="sl">${d.short}</div>
+          </div>`).join('')}
+      </div>
+    </div></div>`;
+  }
+
+  document.getElementById('tt-inner').innerHTML=html;
 }
 
-function renderTable() {
-  const d = new Date(); const start = new Date(d); start.setDate(d.getDate() - (d.getDay()===0?6:d.getDay()-1));
-  const days = Array.from({length:7}, (_,i) => { const curr=new Date(start); curr.setDate(start.getDate()+i); return {n:["Du","Se","Ch","Pa","Ju","Sh","Ya"][i], d:curr.getDate(), iso:curr.toISOString().split('T')[0]}; });
-  document.getElementById('timetable').innerHTML = `
-    <div style="text-align:center; margin-bottom:15px; font-size:13px; font-weight:600; color:var(--text2);">${start.getDate()}.${start.getMonth()+1} - ${days[6].d}.${days[6].iso.split('-')[1]} · 2026</div>
-    <div class="day-tabs">${days.map((x,i) => `<div class="day-tab ${i===d.getDay()-1||(d.getDay()===0&&i===6)?'active':''}" onclick="toast('${x.n} kuni tanlandi')"><div class="day-name">${x.n}</div><div class="day-num">${x.d}</div></div>`).join('')}</div>
-    <div class="card" style="text-align:center; padding:40px 20px;"><div style="font-size:40px; margin-bottom:10px;">🎉</div><div style="font-weight:600;">Darslar yo'q!</div><div style="font-size:12px; color:var(--text3); margin-top:5px;">Mazaza qilib dam oling.</div></div>
-  `;
+function changeWeek(d){
+  S.weekOff+=d;
+  S.dayIdx=d>0?0:4;
+  renderTimetable();
+  haptic('light');
 }
 
-function renderNav() {
-  document.getElementById('navigator').innerHTML = `
-    <div style="display:flex; gap:10px; margin-bottom:15px;"><div style="flex:1; background:var(--accent); color:#fff; padding:12px; border-radius:12px; text-align:center; font-weight:600; font-size:13px;">🏛️ Xonalar</div><div style="flex:1; background:var(--bg3); padding:12px; border-radius:12px; text-align:center; font-size:13px;" onclick="toast('PRO funksiya')">👨‍🏫 Ustozlar</div></div>
-    <div class="card" style="padding:12px 16px; color:var(--text4);">🔍 Qidiruv...</div>
-    <div class="card"><div style="font-weight:600; color:var(--accent);">A-301</div><div style="font-size:12px; color:var(--text3);">A blok, 3-qavat (Ma'ruza)</div></div>
-  `;
+function selectDay(idx,di){
+  S.dayIdx=idx;
+  document.querySelectorAll('.dtab').forEach((b,i)=>{
+    b.classList.toggle('active',i===idx);
+    b.classList.toggle('today',b.classList.contains('today')&&i!==idx);
+  });
+  const lessons=D.tt[di]||[];
+  const card=document.getElementById('ll-card');
+  if(!card) return;
+  if(lessons.length===0){
+    card.innerHTML=`<div class="no-lesson"><div class="no-lesson-ic">🏖️</div><div class="no-lesson-t">Bu kuni darslar yo'q</div></div>`;
+  } else {
+    card.innerHTML=lessons.map((l,i)=>{
+      const cl=CL[i%CL.length];
+      return `<div class="lrow" style="${i>0?'border-top:.5px solid var(--sep)':''}">
+        <div class="lnum-col">
+          <div class="lnum" style="background:${cl}22;color:${cl}">${l.n}</div>
+          <div class="ltmini">${l.st}<br>${l.en}</div>
+        </div>
+        <div class="lbody">
+          <div class="lsubj">${l.s}</div>
+          <div class="lmeta">
+            <span class="lmi">📍 ${l.r}</span>
+            <span class="lmi">👤 ${l.tc}</span>
+            <span class="tag t-gray" style="font-size:10px">${l.tp}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  haptic('light');
 }
 
-window.onload = () => { document.getElementById('top-sub').innerHTML = DATA.profile.group; show('home'); };
+// ══════════════════════════════════════════════════════
+// NAVIGATOR
+// ══════════════════════════════════════════════════════
+function renderNavigator(){
+  let html=`
+  <div class="nav-segs">
+    <button class="nseg ${S.navTab==='rooms'?'active':''}" onclick="switchNavTab('rooms')">🏛️ Xonalar</button>
+    <button class="nseg ${S.navTab==='teachers'?'active':''}" onclick="switchNavTab('teachers')">👨‍🏫 O'qituvchilar</button>
+  </div>
+  <div class="search-b">
+    <span class="si">🔍</span>
+    <input class="sinput" id="nsearch"
+      placeholder="${S.navTab==='rooms'?'A-301, kompyuter lab...':'O\'qituvchi ismi...'}"
+      oninput="filterNav(this.value)">
+  </div>
+  <div id="nlist">${buildNavList('')}</div>`;
+  document.getElementById('nav-inner').innerHTML=html;
+}
+
+function switchNavTab(tab){
+  S.navTab=tab;
+  document.querySelectorAll('.nseg').forEach((b,i)=>{
+    b.classList.toggle('active',['rooms','teachers'][i]===tab);
+  });
+  const inp=document.getElementById('nsearch');
+  inp.value='';
+  inp.placeholder=tab==='rooms'?'A-301, kompyuter lab...':'O\'qituvchi ismi...';
+  document.getElementById('nlist').innerHTML=buildNavList('');
+  haptic('light');
+}
+
+function buildNavList(q){
+  if(S.navTab==='rooms'){
+    let rooms=D.rooms.filter(r=>!q||
+      r.c.toLowerCase().includes(q.toLowerCase())||
+      r.t.toLowerCase().includes(q.toLowerCase())||
+      r.b.toLowerCase().includes(q.toLowerCase())
+    );
+    if(!rooms.length) return '<div style="text-align:center;padding:40px;color:var(--t4)">🔍 Topilmadi</div>';
+    const byB={};
+    rooms.forEach(r=>{ byB[r.b]=byB[r.b]||[]; byB[r.b].push(r); });
+    return Object.entries(byB).map(([b,rs])=>`
+      <div style="font-size:12px;font-weight:700;color:var(--t3);
+        text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px">${b}</div>
+      <div class="card" style="margin-bottom:12px">
+        ${rs.map((r,i)=>`
+          <div class="room-r" style="${i>0?'border-top:.5px solid var(--sep)':''}">
+            <div class="rcode">${r.c}</div>
+            <div class="rinfo">
+              <div class="rname">${r.t}</div>
+              <div class="rmeta">${r.f}-qavat · ${r.cap} o'rin</div>
+            </div>
+            <div class="rtag">${r.f}Q</div>
+          </div>`).join('')}
+      </div>`).join('');
+  } else {
+    if(!S.isPremium) return `
+      <div class="lock-card">
+        <div class="lock-ic">🔒</div>
+        <div class="lock-t">O'qituvchi Tracker</div>
+        <div class="lock-d">O'qituvchilar hozir qayerda ekanligini real vaqtda kuzating. Premium bilan mavjud.</div>
+        <button class="btn-primary" onclick="toast('Tez kunda!','info')">👑 Premium olish</button>
+      </div>`;
+    const teachers=D.teachers.filter(t=>!q||t.n.toLowerCase().includes(q.toLowerCase()));
+    if(!teachers.length) return '<div style="text-align:center;padding:40px;color:var(--t4)">🔍 Topilmadi</div>';
+    return `<div class="card">
+      ${teachers.map((t,i)=>`
+        <div class="teacher-r" style="${i>0?'border-top:.5px solid var(--sep)':''}">
+          <div class="tav">${t.n.split(' ').map(x=>x[0]).slice(0,2).join('')}</div>
+          <div>
+            <div style="font-size:14px;font-weight:600">${t.n}</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:2px">${t.d}</div>
+            ${t.online&&t.r
+              ?`<div class="tloc-on"><span style="font-size:8px">🟢</span> ${t.r} — hozir shu yerda</div>`
+              :`<div class="tloc-off">⚫ Joylashuv noma'lum</div>`}
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+}
+
+function filterNav(q){
+  document.getElementById('nlist').innerHTML=buildNavList(q);
+}
+
+// ─── Boot ─────────────────────────────────────────────
+(function(){
+  initTopbar();
+  setTimeout(()=>renderHome(), 100);
+})();
 </script>
 </body>
 </html>"""
 
-# ── Server, Database va Bot sozlamalari (Ushbu qism tiklandi!) ──
 _bot_task = None
 
 async def run_bot_async():
@@ -226,7 +973,7 @@ app = FastAPI(title="HELPER TDIU", lifespan=lifespan)
 
 @app.get("/")
 async def root():
-    return {"status":"ok","app":"HELPER TDIU"}
+    return {"status":"ok","app":"HELPER TDIU","version":"3.0.0"}
 
 @app.get("/health")
 async def health():
