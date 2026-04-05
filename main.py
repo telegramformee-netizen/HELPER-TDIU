@@ -9,7 +9,7 @@ import config
 from database import init_db
 
 # ══════════════════════════════════════════════════════════════
-# MINI APP HTML — iOS 18 Glassmorphism + Full Features
+# MINI APP HTML — iOS 18 Glassmorphism + Full Features (Tuzatilgan)
 # ══════════════════════════════════════════════════════════════
 MINI_APP_HTML = r"""<!DOCTYPE html>
 <html lang="uz">
@@ -91,7 +91,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .topbar-name{font-size:16px;font-weight:700;letter-spacing:-0.3px}
 .topbar-group{font-size:12px;color:var(--text3);margin-top:1px}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.badge-premium{background:linear-gradient(135deg,#ff9f0a,#ff6b00);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
 .badge-demo{background:var(--bg3);color:var(--text3);font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;border:0.5px solid var(--glass-border);}
 
 /* ── Bottom Nav Glass ── */
@@ -117,7 +116,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 .card-section{padding:16px}
-.sep-line{height:0.5px;background:var(--sep);margin:0 16px}
 
 /* ── Typography & Misc ── */
 .gpa-hero{
@@ -130,51 +128,46 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent; line-height:1;margin-bottom:8px;
 }
 .gpa-hero-sub{font-size:13px;color:var(--text3)}
-.gpa-hero-name{font-size:15px;font-weight:600;color:var(--text);margin-top:10px}
 
 .stat-row{display:flex;gap:10px;margin-bottom:12px}
 .stat-card{flex:1;background:var(--card-bg);border:1px solid var(--glass-border);border-radius:16px;padding:14px 12px;}
 .stat-value{font-size:28px;font-weight:800;line-height:1;margin-bottom:4px}
 .stat-label{font-size:11px;color:var(--text3);font-weight:500}
-.stat-sub{font-size:10px;color:var(--text4);margin-top:2px}
 
-/* Extracted from original */
 .v-blue{color:var(--accent)} .v-green{color:var(--green)} .v-orange{color:var(--orange)} .v-red{color:var(--red)}
 .alert{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border-radius:13px;margin-bottom:8px;font-size:13px;line-height:1.5;border: 1px solid var(--glass-border);backdrop-filter: blur(10px);}
 .alert-icon{font-size:17px;flex-shrink:0;margin-top:1px} .alert b{font-weight:600}
-.alert.danger{background:rgba(255,69,58,0.15);} .alert.warn{background:rgba(255,159,10,0.15);} .alert.info{background:rgba(10,132,255,0.15);}
+.alert.danger{background:rgba(255,69,58,0.15);} .alert.warn{background:rgba(255,159,10,0.15);}
+
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px;}
-.section-title{font-size:20px;font-weight:700;} .section-more{font-size:14px;color:var(--accent);font-weight:500;cursor:pointer}
-.today-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin:-4px -16px;padding:4px 16px 10px;}
-.lesson-chip{flex-shrink:0;background:var(--bg3);border-radius:14px;padding:12px 14px;min-width:150px;border:0.5px solid var(--glass-border);}
+.section-title{font-size:20px;font-weight:700;} 
+.lesson-chip{flex-shrink:0;background:var(--bg3);border-radius:14px;padding:12px 14px;min-width:150px;border:0.5px solid var(--glass-border);margin-bottom:8px;}
 .chip-num{font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;}
 .chip-time{font-size:12px;color:var(--text3);margin-bottom:6px} .chip-subj{font-size:13px;font-weight:600;margin-bottom:4px}
 .chip-room{font-size:11px;color:var(--text4)}
+
 .grade-item{padding:14px 16px;position:relative} .grade-name{font-size:15px;font-weight:600;margin-bottom:3px;}
 .grade-meta{font-size:12px;color:var(--text3);margin-bottom:10px} .grade-total{position:absolute;top:14px;right:16px;font-size:22px;font-weight:800;}
 .grade-bars{display:flex;flex-direction:column;gap:5px} .bar-row{display:flex;align-items:center;gap:8px}
 .bar-label{font-size:11px;color:var(--text4);width:48px;} .bar-track{flex:1;height:4px;background:var(--bg4);border-radius:99px;}
 .bar-fill{height:100%;border-radius:99px;} .bar-val{font-size:11px;color:var(--text3);width:32px;text-align:right;}
-.grade-tags{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap} .tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;}
-.tag-blue{background:rgba(10,132,255,0.2);color:var(--accent)} .tag-green{background:rgba(48,209,88,0.2);color:var(--green)}
-.tag-orange{background:rgba(255,159,10,0.2);color:var(--orange)} .tag-red{background:rgba(255,69,58,0.2);color:var(--red)} .tag-gray{background:var(--bg3);color:var(--text3)}
 .risk-strip{display:flex;align-items:center;gap:6px;background:rgba(255,69,58,0.15);padding:8px 16px;font-size:12px;color:#ff6b63;}
-.nb-strip{display:flex;align-items:center;gap:6px;background:rgba(255,159,10,0.15);padding:8px 16px;font-size:12px;color:#ff9f0a;}
+
 .week-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
-.week-btn{width:36px;height:36px;border-radius:10px;background:var(--bg3);border:1px solid var(--glass-border);color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center;}
+.week-btn{width:36px;height:36px;border-radius:10px;background:var(--bg3);border:1px solid var(--glass-border);color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .week-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--text2)}
 .day-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;}
 .day-tab{flex-shrink:0;padding:7px 14px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:99px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;}
 .day-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .lesson-row{display:flex;gap:12px;padding:14px 16px;} .lesson-num-wrap{width:36px;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .lesson-num-circle{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
-.lesson-time-mini{font-size:9px;color:var(--text4);text-align:center;} .lesson-body{flex:1} .lesson-subject{font-size:14px;font-weight:600;margin-bottom:5px;}
-.lesson-details{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text3)}
-.nav-tabs-row{display:flex;gap:8px;margin-bottom:14px} .nav-seg-btn{flex:1;padding:11px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:12px;font-size:13px;font-weight:600;color:var(--text3);}
+.lesson-body{flex:1} .lesson-subject{font-size:14px;font-weight:600;margin-bottom:5px;}
+
+.nav-tabs-row{display:flex;gap:8px;margin-bottom:14px} .nav-seg-btn{flex:1;padding:11px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:12px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;}
 .nav-seg-btn.active{background:rgba(10,132,255,0.2);border-color:var(--accent);color:var(--accent);}
 .search-wrap{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:12px;padding:11px 14px;margin-bottom:12px;border:1px solid var(--glass-border);}
-.search-input{background:none;border:none;outline:none;color:var(--text);font-size:14px;flex:1;} .room-row{display:flex;align-items:center;gap:14px;padding:13px 16px;}
-.teacher-row{display:flex;align-items:center;gap:14px;padding:13px 16px;} .teacher-avatar{width:42px;height:42px;border-radius:13px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:17px;}
+.search-input{background:none;border:none;outline:none;color:var(--text);font-size:14px;flex:1;} 
+.room-row{display:flex;align-items:center;gap:14px;padding:13px 16px;}
 </style>
 </head>
 <body>
@@ -189,7 +182,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   <div class="topbar-right"><div id="badge-demo" class="badge-demo" style="display:none">DEMO</div></div>
 </header>
 
-<div class="view-container" id="view-container" style="position:relative; width:100%; height:100%; overflow:hidden;">
+<div class="view-container">
   <div class="view" id="view">
     <div class="view-inner" id="view-inner"></div>
   </div>
@@ -203,13 +196,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 </nav>
 
 <script>
-// Telegram integration & Haptic
 const tg = window.Telegram?.WebApp;
 tg?.expand(); tg?.disableVerticalSwipes?.();
 function haptic(type='light') { tg?.HapticFeedback?.impactOccurred(type); }
 
-// Original State & Demo Data
-const S = { view: 'home', isPremium: false, isDemo: true, curWeekOff: 0, curDayIdx: new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, navTab: 'rooms' };
+const S = { view: 'home', isDemo: true, curWeekOff: 0, curDayIdx: new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, navTab: 'rooms' };
 const DEMO = {
   profile: { full_name: "Demo Talaba", group: "IQ-22-01", faculty: "Iqtisodiyot", semester: "2024-2", gpa: 3.45 },
   grades: [
@@ -232,7 +223,6 @@ const COLORS = ["#0a84ff","#30d158","#ff9f0a","#bf5af2","#ff453a","#5e5ce6","#32
 function isoDate(d) { return d.toISOString().slice(0,10); }
 function monday(weekOff=0) { const d = new Date(); const off = d.getDay()===0?6:d.getDay()-1; d.setDate(d.getDate()-off+weekOff*7); d.setHours(0,0,0,0); return d; }
 
-// Number Counter Animation
 function animateValue(id, end, duration) {
     let obj = document.getElementById(id);
     if (!obj) return;
@@ -245,20 +235,27 @@ function animateValue(id, end, duration) {
     }, stepTime);
 }
 
-// ── Navigation ──
+// ── XATOLIK TUZATILGAN JOY ──
 function navigate(view) {
   haptic('light'); S.view = view;
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.id === 'nav-' + view));
   
   const v = document.getElementById('view');
-  v.style.opacity = '0'; v.style.transform = 'translateX(-20px)'; v.classList.remove('active');
+  // CSS animatsiyasini ishlatish uchun class ni o'chiramiz (inline style emas)
+  v.classList.remove('active');
   
   setTimeout(() => {
     const inner = document.getElementById('view-inner');
     inner.innerHTML = ''; v.scrollTop = 0;
-    if (view === 'home') renderHome(inner); else if (view === 'grades') renderGrades(inner); else if (view === 'timetable') renderTimetable(inner); else if (view === 'navigator') renderNavigator(inner);
+    
+    if (view === 'home') renderHome(inner); 
+    else if (view === 'grades') renderGrades(inner); 
+    else if (view === 'timetable') renderTimetable(inner); 
+    else if (view === 'navigator') renderNavigator(inner);
+    
+    // Ma'lumot chizilgandan keyin class ni qaytaramiz
     v.classList.add('active');
-  }, 150); // wait for fade out
+  }, 200); 
 }
 
 function updateTopbar() {
@@ -266,7 +263,6 @@ function updateTopbar() {
   document.getElementById('badge-demo').style.display = S.isDemo ? '' : 'none';
 }
 
-// ── Views ──
 function renderHome(c) {
   const p = DEMO.profile; const risks = DEMO.grades.filter(g=>g.risk).length; const nbs = DEMO.grades.filter(g=>g.nb).length;
   c.innerHTML = `
@@ -283,7 +279,7 @@ function renderHome(c) {
        </div>
     </div>
   `;
-  setTimeout(() => animateValue("gpa-counter", p.gpa, 1000), 200);
+  setTimeout(() => animateValue("gpa-counter", p.gpa, 800), 250);
 }
 
 function renderGrades(c) {
@@ -310,7 +306,7 @@ function renderGrades(c) {
       data: { labels: DEMO.grades.map(g=>g.s.substring(0,6)+'.'), datasets: [{ data: DEMO.grades.map(g=>g.tot), backgroundColor: 'rgba(10, 132, 255, 0.2)', borderColor: '#0a84ff', borderWidth: 2 }] },
       options: { scales: { r: { angleLines: {color: 'rgba(255,255,255,0.1)'}, grid: {color: 'rgba(255,255,255,0.1)'}, ticks: {display:false, max:50} } }, plugins:{legend:{display:false}} }
     });
-  }, 200);
+  }, 250);
 }
 
 function renderTimetable(c) {
@@ -340,7 +336,7 @@ function renderNavigator(c) {
 }
 
 // ── Boot ──
-setTimeout(() => { updateTopbar(); navigate('home'); }, 200);
+setTimeout(() => { updateTopbar(); navigate('home'); }, 100);
 </script>
 </body>
 </html>"""
