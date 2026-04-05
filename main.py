@@ -423,11 +423,55 @@ const S = {
   weekOff:0,
   dayIdx: new Date().getDay()===0 ? 6 : new Date().getDay()-1,
   navTab:'rooms',
+  semIdx:0,  // 0 = joriy semestr
 };
 
 // ─── Demo Data ────────────────────────────────────────────────
 const D = {
   profile:{name:"Ulug'bek Toshmatov",group:"IQ-22-01",faculty:"Iqtisodiyot",sem:"2024-2",gpa:3.45},
+  semesters:[
+    {
+      id:"2024-2", label:"2024-2 · Bahor", active:true,
+      grades:[
+        {s:"Mikroiqtisodiyot",      cur:17,mid:24,fin:null,tot:41,hrs:64,miss:4, risk:false,nb:false,need:14},
+        {s:"Bank ishi va kredit",   cur:15,mid:22,fin:null,tot:37,hrs:72,miss:15,risk:false,nb:true, need:18},
+        {s:"Iqtisodiy siyosat",     cur:18,mid:28,fin:null,tot:46,hrs:80,miss:2, risk:false,nb:false,need:9},
+        {s:"Pul va kredit",         cur:12,mid:18,fin:null,tot:30,hrs:64,miss:14,risk:true, nb:true, need:25},
+        {s:"Marketing asoslari",    cur:19,mid:26,fin:null,tot:45,hrs:72,miss:0, risk:false,nb:false,need:10},
+        {s:"Tadbirkorlik asoslari", cur:16,mid:25,fin:null,tot:41,hrs:56,miss:6, risk:false,nb:false,need:14},
+      ]
+    },
+    {
+      id:"2024-1", label:"2024-1 · Kuz", active:false,
+      grades:[
+        {s:"Makroiqtisodiyot",      cur:19,mid:27,fin:44,tot:90,hrs:64,miss:0, risk:false,nb:false,need:0},
+        {s:"Moliya nazariyasi",     cur:16,mid:24,fin:38,tot:78,hrs:72,miss:4, risk:false,nb:false,need:0},
+        {s:"Statistika",            cur:18,mid:26,fin:41,tot:85,hrs:80,miss:2, risk:false,nb:false,need:0},
+        {s:"Iqtisodiy tahlil",      cur:14,mid:20,fin:30,tot:64,hrs:64,miss:8, risk:false,nb:false,need:0},
+        {s:"Informatika",           cur:20,mid:29,fin:48,tot:97,hrs:72,miss:0, risk:false,nb:false,need:0},
+        {s:"Ingliz tili",           cur:17,mid:25,fin:35,tot:77,hrs:56,miss:4, risk:false,nb:false,need:0},
+      ]
+    },
+    {
+      id:"2023-2", label:"2023-2 · Bahor", active:false,
+      grades:[
+        {s:"Matematika",            cur:18,mid:26,fin:42,tot:86,hrs:80,miss:2, risk:false,nb:false,need:0},
+        {s:"Iqtisodiyot asoslari",  cur:17,mid:25,fin:40,tot:82,hrs:72,miss:0, risk:false,nb:false,need:0},
+        {s:"Falsafa",               cur:15,mid:22,fin:35,tot:72,hrs:64,miss:6, risk:false,nb:false,need:0},
+        {s:"Tarix",                 cur:16,mid:24,fin:38,tot:78,hrs:56,miss:4, risk:false,nb:false,need:0},
+        {s:"Sport",                 cur:20,mid:28,fin:45,tot:93,hrs:48,miss:0, risk:false,nb:false,need:0},
+      ]
+    },
+    {
+      id:"2023-1", label:"2023-1 · Kuz", active:false,
+      grades:[
+        {s:"Matematika (kirish)",   cur:19,mid:27,fin:43,tot:89,hrs:80,miss:0, risk:false,nb:false,need:0},
+        {s:"Ona tili",              cur:18,mid:26,fin:40,tot:84,hrs:64,miss:2, risk:false,nb:false,need:0},
+        {s:"Iqtisodiyot kirish",    cur:17,mid:25,fin:38,tot:80,hrs:72,miss:4, risk:false,nb:false,need:0},
+        {s:"Informatika (kirish)",  cur:20,mid:28,fin:46,tot:94,hrs:56,miss:0, risk:false,nb:false,need:0},
+      ]
+    },
+  ],
   grades:[
     {s:"Mikroiqtisodiyot",       cur:17,mid:24,fin:null,tot:41,hrs:64,miss:4, risk:false,nb:false,need:14},
     {s:"Bank ishi va kredit",    cur:15,mid:22,fin:null,tot:37,hrs:72,miss:15,risk:false,nb:true, need:18},
@@ -640,16 +684,37 @@ function renderHome(){
 // GRADES
 // ══════════════════════════════════════════════════════
 function renderGrades(){
-  const grades=D.grades;
+  const sem = D.semesters[S.semIdx];
+  const grades = sem ? sem.grades : D.grades;
+  const isActive = sem ? sem.active : true;
   const total=grades.reduce((s,g)=>s+g.tot,0);
   const gpa=(total/grades.length/25).toFixed(2);
-  const passed=grades.filter(g=>g.fin!==null&&g.tot>=55).length;
+
+  // Semester tabs
+  const semTabs = D.semesters.map((s,i)=>`
+    <button onclick="selectSem(${i})" style="
+      flex-shrink:0;padding:7px 14px;
+      background:${i===S.semIdx?'var(--accent)':'var(--bg3)'};
+      border:none;border-radius:99px;
+      font-size:13px;font-weight:600;
+      color:${i===S.semIdx?'#fff':'var(--t3)'};
+      cursor:pointer;font-family:Inter,sans-serif;
+      box-shadow:${i===S.semIdx?'0 0 14px rgba(10,132,255,.4)':'none'};
+      transition:all .15s;white-space:nowrap;
+    ">${s.label}${s.active?' 🔴':''}</button>
+  `).join('');
 
   let html=`
+  <!-- Semester Tabs -->
+  <div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;
+    margin-bottom:14px;scrollbar-width:none;">
+    ${semTabs}
+  </div>
+
   <div class="card" style="margin-bottom:14px">
     <div class="cpd" style="display:flex;justify-content:space-between;align-items:center">
       <div>
-        <div class="ctitle" style="margin-bottom:4px">GPA</div>
+        <div class="ctitle" style="margin-bottom:4px">GPA · ${sem?sem.id:''}</div>
         <div style="font-size:42px;font-weight:900;letter-spacing:-1.5px;
           background:linear-gradient(135deg,#0a84ff,#5e5ce6);
           -webkit-background-clip:text;-webkit-text-fill-color:transparent">${gpa}</div>
@@ -725,6 +790,14 @@ function renderGrades(){
   }
 
   document.getElementById('grades-inner').innerHTML=html;
+}
+
+function selectSem(idx){
+  S.semIdx=idx;
+  renderGrades();
+  tg?.HapticFeedback?.selectionChanged();
+  // Scroll to top
+  document.getElementById('v-grades').scrollTop=0;
 }
 
 // ══════════════════════════════════════════════════════
