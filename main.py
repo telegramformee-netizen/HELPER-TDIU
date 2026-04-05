@@ -9,7 +9,7 @@ import config
 from database import init_db
 
 # ══════════════════════════════════════════════════════════════
-# MINI APP HTML — iOS 18 PRO VERSION (Soddalashtirilgan Bosh Sahifa)
+# MINI APP HTML — iOS 18 PRO VERSION (Soddalashtirilgan)
 # ══════════════════════════════════════════════════════════════
 MINI_APP_HTML = r"""<!DOCTYPE html>
 <html lang="uz">
@@ -58,7 +58,7 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .nav-label { font-size:10px; font-weight:500; }
 
 .lock-card { background:rgba(10,132,255,0.1); border:1px solid var(--accent); border-radius:18px; padding:20px; text-align:center; margin-bottom:12px; }
-.btn-pro { width:100%; background:var(--accent); color:#fff; border:none; padding:14px; border-radius:12px; font-weight:600; margin-top:12px; }
+.btn-pro { width:100%; background:var(--accent); color:#fff; border:none; padding:14px; border-radius:12px; font-weight:600; margin-top:12px; cursor:pointer; }
 
 #toasts { position:fixed; bottom:100px; left:20px; right:20px; z-index:1000; }
 .toast { background:rgba(40,40,40,0.9); padding:12px 20px; border-radius:12px; font-size:14px; margin-top:8px; animation:slideUp 0.3s; }
@@ -123,33 +123,24 @@ function renderHome() {
           <div style="font-size:12px; color:var(--accent); font-weight:700; margin-bottom:4px; text-transform:uppercase;">Umumiy GPA</div>
           <div style="font-size:42px; font-weight:800; line-height:1;">${p.gpa.toFixed(2)}</div>
        </div>
-       <div style="font-size:14px; color:var(--text3); font-weight:500;">
-          ${p.sem}
-       </div>
+       <div style="font-size:14px; color:var(--text3); font-weight:500;">${p.sem}</div>
     </div>
   `;
 
-  // Soddalashtirilgan Xavf va NB (takrorlanishlarsiz)
   if (risks > 0 || nbs > 0) {
      html += `<div style="display:flex; gap:10px; margin-bottom:12px;">`;
      if (risks > 0) {
         html += `
           <div style="flex:1; background:rgba(255,69,58,0.15); border:1px solid rgba(255,69,58,0.3); border-radius:16px; padding:14px; display:flex; align-items:center; gap:12px;">
              <div style="font-size:24px;">🚨</div>
-             <div>
-                <div style="color:var(--red); font-size:18px; font-weight:800; line-height:1;">${risks} ta</div>
-                <div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Qayta topshirish</div>
-             </div>
+             <div><div style="color:var(--red); font-size:18px; font-weight:800; line-height:1;">${risks} ta</div><div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Qayta topshirish</div></div>
           </div>`;
      }
      if (nbs > 0) {
         html += `
           <div style="flex:1; background:rgba(255,159,10,0.15); border:1px solid rgba(255,159,10,0.3); border-radius:16px; padding:14px; display:flex; align-items:center; gap:12px;">
              <div style="font-size:24px;">📍</div>
-             <div>
-                <div style="color:var(--orange); font-size:18px; font-weight:800; line-height:1;">${nbs} ta</div>
-                <div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Davomat xavfi</div>
-             </div>
+             <div><div style="color:var(--orange); font-size:18px; font-weight:800; line-height:1;">${nbs} ta</div><div style="color:var(--text2); font-size:12px; font-weight:500; margin-top:4px;">Davomat xavfi</div></div>
           </div>`;
      }
      html += `</div>`;
@@ -201,9 +192,46 @@ window.onload = () => { document.getElementById('top-sub').innerHTML = DATA.prof
 </body>
 </html>"""
 
-# ── Server sozlamalari ───────────────────────────────────────
-app = FastAPI(lifespan=lifespan)
+# ── Server, Database va Bot sozlamalari (Ushbu qism tiklandi!) ──
+_bot_task = None
+
+async def run_bot_async():
+    if not config.BOT_TOKEN:
+        print("BOT_TOKEN yo'q!")
+        return
+    from bot import create_bot, create_dispatcher
+    bot = create_bot()
+    dp  = create_dispatcher()
+    print("Bot polling boshlandi...")
+    try:
+        await dp.start_polling(bot, allowed_updates=["message","callback_query"])
+    except Exception as e:
+        print("Bot xatosi: " + str(e))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    print("Database tayyor")
+    global _bot_task
+    if config.BOT_TOKEN:
+        _bot_task = asyncio.create_task(run_bot_async())
+        print("Bot task boshlandi")
+    yield
+    if _bot_task:
+        _bot_task.cancel()
+        try: await _bot_task
+        except asyncio.CancelledError: pass
+
+app = FastAPI(title="HELPER TDIU", lifespan=lifespan)
+
 @app.get("/")
-async def root(): return {"status":"ok"}
+async def root():
+    return {"status":"ok","app":"HELPER TDIU"}
+
+@app.get("/health")
+async def health():
+    return {"status":"ok"}
+
 @app.get("/app", response_class=HTMLResponse)
-async def mini_app(): return MINI_APP_HTML
+async def mini_app():
+    return MINI_APP_HTML
