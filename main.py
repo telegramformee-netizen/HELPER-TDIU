@@ -9,47 +9,49 @@ import config
 from database import init_db
 
 # ══════════════════════════════════════════════════════════════
-# MINI APP HTML — iOS 18 Glassmorphism UI
+# MINI APP HTML — iOS 18 Glassmorphism + Full Features
 # ══════════════════════════════════════════════════════════════
 MINI_APP_HTML = r"""<!DOCTYPE html>
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HELPER · TDIU</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #000000;
-  --text: #ffffff;
-  --text-sec: rgba(235, 235, 245, 0.6);
-  --accent: #0a84ff;
-  --green: #30d158;
-  --red: #ff453a;
-  --orange: #ff9f0a;
-  --card-bg: rgba(28, 28, 30, 0.6);
+  --bg:      #000000;
+  --bg2:     rgba(28, 28, 30, 0.4);
+  --bg3:     rgba(44, 44, 46, 0.5);
+  --bg4:     rgba(58, 58, 60, 0.6);
+  --text:    #ffffff;
+  --text2:   rgba(235, 235, 245, 0.8);
+  --text3:   rgba(235, 235, 245, 0.6);
+  --text4:   rgba(235, 235, 245, 0.4);
+  --accent:  #0a84ff;
+  --green:   #30d158;
+  --orange:  #ff9f0a;
+  --red:     #ff453a;
+  --yellow:  #ffd60a;
+  --purple:  #bf5af2;
+  --sep:     rgba(255,255,255,0.08);
+  --card-bg: rgba(28, 28, 30, 0.55);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --nav-h: 85px;
-  --top-h: 60px;
+  --nav-h:   83px;
+  --top-h:   56px;
 }
-
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body {
-  font-family: 'Inter', -apple-system, sans-serif;
-  background-color: var(--bg);
-  color: var(--text);
-  overflow: hidden;
-  height: 100vh;
-  position: relative;
-}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Inter',-apple-system,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
 
 /* ── Dynamic Blurred Background ── */
 .bg-blobs {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-  overflow: hidden; filter: blur(80px); opacity: 0.4;
+  overflow: hidden; filter: blur(80px); opacity: 0.35; pointer-events: none;
 }
 .blob {
   position: absolute; border-radius: 50%;
@@ -58,313 +60,287 @@ body {
 .blob-1 { width: 300px; height: 300px; background: #0a84ff; top: -10%; left: -10%; animation-delay: 0s; }
 .blob-2 { width: 400px; height: 400px; background: #bf5af2; bottom: -20%; right: -10%; animation-delay: -5s; }
 .blob-3 { width: 250px; height: 250px; background: #30d158; top: 40%; left: 50%; animation-delay: -10s; }
+@keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(50px, 50px) scale(1.1); } }
 
-@keyframes float {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(50px, 50px) scale(1.1); }
-}
-
-/* ── Layout ── */
-.topbar {
-  position: fixed; top: 0; width: 100%; height: var(--top-h);
-  background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
-  z-index: 100; border-bottom: 1px solid var(--glass-border);
-}
-.top-title { font-weight: 700; font-size: 17px; }
-.top-subtitle { font-size: 12px; color: var(--text-sec); }
-
-.view-container {
-  position: relative; width: 100%; height: 100%; overflow: hidden;
-}
-.view {
-  position: absolute; top: var(--top-h); left: 0; width: 100%; height: calc(100% - var(--top-h) - var(--nav-h));
-  overflow-y: auto; padding: 15px 15px 30px;
+/* ── Scrollable area & Transitions ── */
+.view{
+  position:fixed;top:var(--top-h);left:0;right:0; bottom:var(--nav-h);
+  overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
   opacity: 0; transform: translateX(20px); pointer-events: none;
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
-.view.active {
-  opacity: 1; transform: translateX(0); pointer-events: auto;
-}
+.view.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+.view::-webkit-scrollbar{display:none}
+.view-inner{padding:12px 16px 20px}
 
-/* ── Glass Cards ── */
-.card {
-  background: var(--card-bg);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px; padding: 20px; margin-bottom: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+/* ── Topbar Glass ── */
+.topbar{
+  position:fixed;top:0;left:0;right:0;height:var(--top-h);
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);
+  border-bottom:0.5px solid var(--glass-border);
+  display:flex;align-items:center;padding:0 20px; z-index:100;
 }
-
-/* ── Typography & Numbers ── */
-.hero-gpa {
-  font-size: 72px; font-weight: 800; line-height: 1;
-  background: linear-gradient(135deg, #fff, #a1a1aa);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  margin: 10px 0; text-align: center;
+.topbar-logo{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,#0a84ff,#5e5ce6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:800;color:#fff;margin-right:11px;
+  box-shadow:0 2px 8px rgba(10,132,255,0.4);
 }
-.gpa-label { text-align: center; font-size: 14px; color: var(--text-sec); font-weight: 600; text-transform: uppercase; letter-spacing: 1px;}
+.topbar-name{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+.topbar-group{font-size:12px;color:var(--text3);margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.badge-premium{background:linear-gradient(135deg,#ff9f0a,#ff6b00);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.badge-demo{background:var(--bg3);color:var(--text3);font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;border:0.5px solid var(--glass-border);}
 
-/* ── Grid Stats ── */
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-.stat-box {
-  background: var(--card-bg); border: 1px solid var(--glass-border);
-  border-radius: 16px; padding: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+/* ── Bottom Nav Glass ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0; height:var(--nav-h);
+  background:rgba(0,0,0,0.7); backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border-top:0.5px solid var(--glass-border);
+  display:flex;align-items:flex-start;padding-top:10px; z-index:100;
 }
-.stat-val { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
-.stat-title { font-size: 11px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* ── Chart Container ── */
-.chart-container { position: relative; height: 200px; width: 100%; margin-top: 10px; }
-
-/* ── List Items ── */
-.list-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;cursor:pointer; color:var(--text4);transition:0.2s;
 }
-.list-item:last-child { border-bottom: none; padding-bottom: 0; }
-.li-title { font-size: 15px; font-weight: 600; }
-.li-sub { font-size: 12px; color: var(--text-sec); margin-top: 4px; }
-.li-right { font-size: 18px; font-weight: 700; }
+.nav-item.active{color:var(--accent)}
+.nav-icon{font-size:24px; transition: transform 0.2s; }
+.nav-item:active .nav-icon { transform: scale(0.8); }
+.nav-label{font-size:10px;font-weight:500;}
 
-/* ── Bottom Nav ── */
-.bottom-nav {
-  position: fixed; bottom: 0; width: 100%; height: var(--nav-h);
-  background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
-  border-top: 1px solid var(--glass-border); display: flex; padding-bottom: 15px; z-index: 100;
+/* ── Cards Glass ── */
+.card{
+  background:var(--card-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius:16px; overflow:hidden; margin-bottom:12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
-.nav-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: var(--text-sec); cursor: pointer; transition: 0.2s;
-}
-.nav-btn.active { color: var(--accent); }
-.nav-icon { font-size: 24px; margin-bottom: 4px; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-.nav-btn:active .nav-icon { transform: scale(0.8); }
-.nav-label { font-size: 10px; font-weight: 500; }
+.card-section{padding:16px}
+.sep-line{height:0.5px;background:var(--sep);margin:0 16px}
 
+/* ── Typography & Misc ── */
+.gpa-hero{
+  background:linear-gradient(160deg, rgba(10,132,255,0.1) 0%, rgba(0,0,0,0) 100%);
+  border: 1px solid var(--glass-border); border-radius:20px; padding:24px 20px; margin-bottom:12px; text-align:center;
+}
+.gpa-hero-label{font-size:12px;font-weight:600;color:var(--accent); text-transform:uppercase;margin-bottom:6px}
+.gpa-hero-value{
+  font-size:64px;font-weight:800; background:linear-gradient(135deg,#fff,#a1a1aa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent; line-height:1;margin-bottom:8px;
+}
+.gpa-hero-sub{font-size:13px;color:var(--text3)}
+.gpa-hero-name{font-size:15px;font-weight:600;color:var(--text);margin-top:10px}
+
+.stat-row{display:flex;gap:10px;margin-bottom:12px}
+.stat-card{flex:1;background:var(--card-bg);border:1px solid var(--glass-border);border-radius:16px;padding:14px 12px;}
+.stat-value{font-size:28px;font-weight:800;line-height:1;margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500}
+.stat-sub{font-size:10px;color:var(--text4);margin-top:2px}
+
+/* Extracted from original */
+.v-blue{color:var(--accent)} .v-green{color:var(--green)} .v-orange{color:var(--orange)} .v-red{color:var(--red)}
+.alert{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border-radius:13px;margin-bottom:8px;font-size:13px;line-height:1.5;border: 1px solid var(--glass-border);backdrop-filter: blur(10px);}
+.alert-icon{font-size:17px;flex-shrink:0;margin-top:1px} .alert b{font-weight:600}
+.alert.danger{background:rgba(255,69,58,0.15);} .alert.warn{background:rgba(255,159,10,0.15);} .alert.info{background:rgba(10,132,255,0.15);}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px;}
+.section-title{font-size:20px;font-weight:700;} .section-more{font-size:14px;color:var(--accent);font-weight:500;cursor:pointer}
+.today-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin:-4px -16px;padding:4px 16px 10px;}
+.lesson-chip{flex-shrink:0;background:var(--bg3);border-radius:14px;padding:12px 14px;min-width:150px;border:0.5px solid var(--glass-border);}
+.chip-num{font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;}
+.chip-time{font-size:12px;color:var(--text3);margin-bottom:6px} .chip-subj{font-size:13px;font-weight:600;margin-bottom:4px}
+.chip-room{font-size:11px;color:var(--text4)}
+.grade-item{padding:14px 16px;position:relative} .grade-name{font-size:15px;font-weight:600;margin-bottom:3px;}
+.grade-meta{font-size:12px;color:var(--text3);margin-bottom:10px} .grade-total{position:absolute;top:14px;right:16px;font-size:22px;font-weight:800;}
+.grade-bars{display:flex;flex-direction:column;gap:5px} .bar-row{display:flex;align-items:center;gap:8px}
+.bar-label{font-size:11px;color:var(--text4);width:48px;} .bar-track{flex:1;height:4px;background:var(--bg4);border-radius:99px;}
+.bar-fill{height:100%;border-radius:99px;} .bar-val{font-size:11px;color:var(--text3);width:32px;text-align:right;}
+.grade-tags{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap} .tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;}
+.tag-blue{background:rgba(10,132,255,0.2);color:var(--accent)} .tag-green{background:rgba(48,209,88,0.2);color:var(--green)}
+.tag-orange{background:rgba(255,159,10,0.2);color:var(--orange)} .tag-red{background:rgba(255,69,58,0.2);color:var(--red)} .tag-gray{background:var(--bg3);color:var(--text3)}
+.risk-strip{display:flex;align-items:center;gap:6px;background:rgba(255,69,58,0.15);padding:8px 16px;font-size:12px;color:#ff6b63;}
+.nb-strip{display:flex;align-items:center;gap:6px;background:rgba(255,159,10,0.15);padding:8px 16px;font-size:12px;color:#ff9f0a;}
+.week-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.week-btn{width:36px;height:36px;border-radius:10px;background:var(--bg3);border:1px solid var(--glass-border);color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center;}
+.week-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--text2)}
+.day-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;}
+.day-tab{flex-shrink:0;padding:7px 14px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:99px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;}
+.day-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.lesson-row{display:flex;gap:12px;padding:14px 16px;} .lesson-num-wrap{width:36px;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.lesson-num-circle{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+.lesson-time-mini{font-size:9px;color:var(--text4);text-align:center;} .lesson-body{flex:1} .lesson-subject{font-size:14px;font-weight:600;margin-bottom:5px;}
+.lesson-details{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text3)}
+.nav-tabs-row{display:flex;gap:8px;margin-bottom:14px} .nav-seg-btn{flex:1;padding:11px;background:var(--bg3);border:1px solid var(--glass-border);border-radius:12px;font-size:13px;font-weight:600;color:var(--text3);}
+.nav-seg-btn.active{background:rgba(10,132,255,0.2);border-color:var(--accent);color:var(--accent);}
+.search-wrap{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:12px;padding:11px 14px;margin-bottom:12px;border:1px solid var(--glass-border);}
+.search-input{background:none;border:none;outline:none;color:var(--text);font-size:14px;flex:1;} .room-row{display:flex;align-items:center;gap:14px;padding:13px 16px;}
+.teacher-row{display:flex;align-items:center;gap:14px;padding:13px 16px;} .teacher-avatar{width:42px;height:42px;border-radius:13px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:17px;}
 </style>
 </head>
 <body>
 
 <div class="bg-blobs">
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-  <div class="blob blob-3"></div>
+  <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
 </div>
 
 <header class="topbar">
-  <div>
-    <div class="top-title">HELPER TDIU</div>
-    <div class="top-subtitle">IQ-22-01 · Iqtisodiyot</div>
-  </div>
-  <div style="background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 10px; font-size: 12px; font-weight: bold;">
-    DEMO
-  </div>
+  <div class="topbar-logo">H</div>
+  <div><div class="topbar-name">HELPER TDIU</div><div class="topbar-group" id="tbar-group">Yuklanmoqda...</div></div>
+  <div class="topbar-right"><div id="badge-demo" class="badge-demo" style="display:none">DEMO</div></div>
 </header>
 
-<div class="view-container">
-  
-  <div id="view-home" class="view active">
-    <div class="card" style="margin-top: 10px; padding-top: 30px; padding-bottom: 30px;">
-      <div class="gpa-label">Umumiy GPA</div>
-      <div class="hero-gpa" id="gpa-counter">0.00</div>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-box">
-        <div class="stat-val" style="color: var(--red);">2</div>
-        <div class="stat-title">Xavf</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val" style="color: var(--orange);">1</div>
-        <div class="stat-title">NB Ogohlantirish</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 style="font-size: 14px; margin-bottom: 15px; color: var(--text-sec);">BUGUNGI DARSLAR</h3>
-      <div class="list-item">
-        <div>
-          <div class="li-title">Mikroiqtisodiyot</div>
-          <div class="li-sub">08:30 - 09:50 · Ma'ruza</div>
-        </div>
-        <div class="li-right" style="font-size:14px; color: var(--accent);">A-301</div>
-      </div>
-      <div class="list-item">
-        <div>
-          <div class="li-title">Bank ishi va kredit</div>
-          <div class="li-sub">11:30 - 12:50 · Seminar</div>
-        </div>
-        <div class="li-right" style="font-size:14px; color: var(--accent);">B-204</div>
-      </div>
-    </div>
+<div class="view-container" id="view-container" style="position:relative; width:100%; height:100%; overflow:hidden;">
+  <div class="view" id="view">
+    <div class="view-inner" id="view-inner"></div>
   </div>
-
-  <div id="view-grades" class="view">
-    <div class="card">
-      <h3 style="font-size: 14px; margin-bottom: 5px; color: var(--text-sec); text-align: center;">O'ZLASHTIRISH GRAFIGI</h3>
-      <div class="chart-container">
-        <canvas id="radarChart"></canvas>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 style="font-size: 14px; margin-bottom: 15px; color: var(--text-sec);">BARCHA FANLAR</h3>
-      
-      <div class="list-item">
-        <div>
-          <div class="li-title">Iqtisodiy siyosat</div>
-          <div class="li-sub">J: 18 · O: 28</div>
-        </div>
-        <div class="li-right" style="color: var(--green);">46</div>
-      </div>
-      
-      <div class="list-item">
-        <div>
-          <div class="li-title">Marketing asoslari</div>
-          <div class="li-sub">J: 19 · O: 26</div>
-        </div>
-        <div class="li-right" style="color: var(--green);">45</div>
-      </div>
-      
-      <div class="list-item">
-        <div>
-          <div class="li-title">Mikroiqtisodiyot</div>
-          <div class="li-sub">J: 17 · O: 24</div>
-        </div>
-        <div class="li-right" style="color: var(--accent);">41</div>
-      </div>
-
-      <div class="list-item">
-        <div>
-          <div class="li-title">Pul va kredit</div>
-          <div class="li-sub" style="color: var(--red);">Yakuniyda 25 kerak</div>
-        </div>
-        <div class="li-right" style="color: var(--red);">30</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="view-timetable" class="view">
-     <div class="card">
-        <div style="text-align: center; padding: 40px 10px;">
-            <div style="font-size: 40px; margin-bottom: 10px;">🚧</div>
-            <div style="font-size: 18px; font-weight: 600;">Jadval tayyorlanmoqda</div>
-            <div style="font-size: 13px; color: var(--text-sec); margin-top: 5px;">Tez kunda yangi dizaynda ishga tushadi.</div>
-        </div>
-     </div>
-  </div>
-
 </div>
 
 <nav class="bottom-nav">
-  <div class="nav-btn active" id="nav-home" onclick="nav('home')">
-    <div class="nav-icon">🏠</div>
-    <div class="nav-label">Bosh</div>
-  </div>
-  <div class="nav-btn" id="nav-grades" onclick="nav('grades')">
-    <div class="nav-icon">📊</div>
-    <div class="nav-label">Baholar</div>
-  </div>
-  <div class="nav-btn" id="nav-timetable" onclick="nav('timetable')">
-    <div class="nav-icon">📅</div>
-    <div class="nav-label">Jadval</div>
-  </div>
+  <button class="nav-item active" id="nav-home" onclick="navigate('home')"><span class="nav-icon">🏠</span><span class="nav-label">Bosh</span></button>
+  <button class="nav-item" id="nav-grades" onclick="navigate('grades')"><span class="nav-icon">📊</span><span class="nav-label">Baholar</span></button>
+  <button class="nav-item" id="nav-timetable" onclick="navigate('timetable')"><span class="nav-icon">📅</span><span class="nav-label">Jadval</span></button>
+  <button class="nav-item" id="nav-navigator" onclick="navigate('navigator')"><span class="nav-icon">🗺️</span><span class="nav-label">Navigator</span></button>
 </nav>
 
 <script>
+// Telegram integration & Haptic
 const tg = window.Telegram?.WebApp;
-tg?.expand();
-tg?.disableVerticalSwipes?.();
+tg?.expand(); tg?.disableVerticalSwipes?.();
+function haptic(type='light') { tg?.HapticFeedback?.impactOccurred(type); }
 
-function haptic() { tg?.HapticFeedback?.impactOccurred('light'); }
+// Original State & Demo Data
+const S = { view: 'home', isPremium: false, isDemo: true, curWeekOff: 0, curDayIdx: new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, navTab: 'rooms' };
+const DEMO = {
+  profile: { full_name: "Demo Talaba", group: "IQ-22-01", faculty: "Iqtisodiyot", semester: "2024-2", gpa: 3.45 },
+  grades: [
+    {s:"Mikroiqtisodiyot",cur:17,mid:24,fin:null,tot:41,risk:false,nb:false,needed:14,hrs:64,miss:4},
+    {s:"Bank ishi va kredit",cur:15,mid:22,fin:null,tot:37,risk:false,nb:true,needed:18,hrs:72,miss:15},
+    {s:"Iqtisodiy siyosat",cur:18,mid:28,fin:null,tot:46,risk:false,nb:false,needed:9,hrs:80,miss:2},
+    {s:"Pul va kredit",cur:12,mid:18,fin:null,tot:30,risk:true,nb:true,needed:25,hrs:64,miss:14},
+    {s:"Marketing asoslari",cur:19,mid:26,fin:null,tot:45,risk:false,nb:false,needed:10,hrs:72,miss:0},
+  ],
+  timetable: {
+    "2025-04-07":[{num:1,start:"08:30",end:"09:50",s:"Mikroiqtisodiyot",type:"Ma'ruza",teacher:"Salimov B.",room:"A-301"}, {num:3,start:"11:30",end:"12:50",s:"Bank ishi",type:"Seminar",teacher:"Rahimov N.",room:"B-204"}],
+    "2025-04-08":[{num:2,start:"10:00",end:"11:20",s:"Pul va kredit",type:"Ma'ruza",teacher:"Hasanov M.",room:"A-101"}],
+  },
+  rooms: [{code:"A-101",building:"A blok",floor:1,cap:120,type:"Ma'ruza zali"},{code:"B-204",building:"B blok",floor:2,cap:30,type:"Seminar xona"}],
+  teachers: [{name:"Salimov B.A.",dept:"Mikroiqtisodiyot",room:"A-301"},{name:"Rahimov N.X.",dept:"Bank ishi",room:null}]
+};
 
-// Navigation logic with animations
-function nav(viewId) {
-  haptic();
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('nav-' + viewId).classList.add('active');
-
-  document.querySelectorAll('.view').forEach(v => {
-    v.style.opacity = '0';
-    v.style.transform = 'translateX(-20px)';
-    v.classList.remove('active');
-  });
-
-  const activeView = document.getElementById('view-' + viewId);
-  activeView.classList.add('active');
-  activeView.style.transform = 'translateX(20px)';
-  
-  setTimeout(() => {
-    activeView.style.opacity = '1';
-    activeView.style.transform = 'translateX(0)';
-  }, 50);
-  
-  if(viewId === 'grades') renderChart();
-}
+const DAYS_UZ = ["Du","Se","Ch","Pa","Ju","Sh","Ya"];
+const COLORS = ["#0a84ff","#30d158","#ff9f0a","#bf5af2","#ff453a","#5e5ce6","#32ade6"];
+function isoDate(d) { return d.toISOString().slice(0,10); }
+function monday(weekOff=0) { const d = new Date(); const off = d.getDay()===0?6:d.getDay()-1; d.setDate(d.getDate()-off+weekOff*7); d.setHours(0,0,0,0); return d; }
 
 // Number Counter Animation
-function animateValue(id, start, end, duration) {
-    if (start === end) return;
-    var range = end - start;
-    var current = start;
-    var increment = end > start? 0.05 : -0.05;
-    var stepTime = Math.abs(Math.floor(duration / (range / increment)));
-    var obj = document.getElementById(id);
-    var timer = setInterval(function() {
+function animateValue(id, end, duration) {
+    let obj = document.getElementById(id);
+    if (!obj) return;
+    let current = 0; let increment = end > 0 ? 0.05 : -0.05;
+    let stepTime = Math.abs(Math.floor(duration / (end / increment)));
+    let timer = setInterval(() => {
         current += increment;
         obj.innerHTML = current.toFixed(2);
-        if (current >= end) {
-            clearInterval(timer);
-            obj.innerHTML = end.toFixed(2);
-        }
+        if (current >= end) { clearInterval(timer); obj.innerHTML = end.toFixed(2); }
     }, stepTime);
 }
 
-// Chart.js Setup
-let myChart = null;
-function renderChart() {
-    if(myChart) return; // Prevent recreation
-    const ctx = document.getElementById('radarChart').getContext('2d');
-    
-    Chart.defaults.color = 'rgba(235, 235, 245, 0.6)';
-    Chart.defaults.font.family = 'Inter';
-    
-    myChart = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: ['Mikroiq.', 'Bank ishi', 'Siyosat', 'Pul-kredit', 'Marketing'],
-            datasets: [{
-                label: 'Ball',
-                data: [41, 37, 46, 30, 45],
-                backgroundColor: 'rgba(10, 132, 255, 0.2)',
-                borderColor: 'rgba(10, 132, 255, 1)',
-                pointBackgroundColor: '#fff',
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                r: {
-                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                    pointLabels: { font: { size: 10 } },
-                    ticks: { display: false, max: 50, min: 0 }
-                }
-            },
-            plugins: { legend: { display: false } }
-        }
-    });
+// ── Navigation ──
+function navigate(view) {
+  haptic('light'); S.view = view;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.id === 'nav-' + view));
+  
+  const v = document.getElementById('view');
+  v.style.opacity = '0'; v.style.transform = 'translateX(-20px)'; v.classList.remove('active');
+  
+  setTimeout(() => {
+    const inner = document.getElementById('view-inner');
+    inner.innerHTML = ''; v.scrollTop = 0;
+    if (view === 'home') renderHome(inner); else if (view === 'grades') renderGrades(inner); else if (view === 'timetable') renderTimetable(inner); else if (view === 'navigator') renderNavigator(inner);
+    v.classList.add('active');
+  }, 150); // wait for fade out
 }
 
-// Init
-window.onload = () => {
-    setTimeout(() => {
-        animateValue("gpa-counter", 0.00, 3.45, 1200);
-    }, 300);
-};
+function updateTopbar() {
+  document.getElementById('tbar-group').textContent = DEMO.profile.group + ' · ' + DEMO.profile.faculty;
+  document.getElementById('badge-demo').style.display = S.isDemo ? '' : 'none';
+}
+
+// ── Views ──
+function renderHome(c) {
+  const p = DEMO.profile; const risks = DEMO.grades.filter(g=>g.risk).length; const nbs = DEMO.grades.filter(g=>g.nb).length;
+  c.innerHTML = `
+    <div class="gpa-hero"><div class="gpa-hero-label">Umumiy GPA</div><div class="gpa-hero-value" id="gpa-counter">0.00</div><div class="gpa-hero-sub">${p.semester}</div></div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-value v-${risks>0?'red':'green'}">${risks}</div><div class="stat-label">Xavf</div></div>
+      <div class="stat-card"><div class="stat-value v-${nbs>0?'orange':'green'}">${nbs}</div><div class="stat-label">NB</div></div>
+    </div>
+    ${risks > 0 ? `<div class="alert danger"><span class="alert-icon">🚨</span><div><b>${risks} ta fanda</b> qayta topshirish xavfi mavjud!</div></div>` : ''}
+    <div class="section-header"><div class="section-title">Bugungi darslar</div></div>
+    <div class="card">
+       <div class="lesson-chip" style="border:none; background:transparent;">
+          <div class="chip-num">1-dars</div><div class="chip-subj">Mikroiqtisodiyot</div><div class="chip-room">📍 A-301</div>
+       </div>
+    </div>
+  `;
+  setTimeout(() => animateValue("gpa-counter", p.gpa, 1000), 200);
+}
+
+function renderGrades(c) {
+  c.innerHTML = `
+    <div class="card" style="padding: 10px;">
+        <h3 style="font-size:12px; color:var(--text3); text-align:center; margin: 10px 0;">O'ZLASHTIRISH GRAFIGI</h3>
+        <div style="height:200px; width:100%;"><canvas id="radarChart"></canvas></div>
+    </div>
+    ${DEMO.grades.map((g,i) => `
+    <div class="card" style="${g.risk?'border-color:rgba(255,69,58,0.5);':''}">
+      <div class="grade-item">
+        <div class="grade-name">${g.s}</div><div class="grade-total" style="color:${g.tot>70?'var(--green)':'var(--orange)'}">${g.tot}</div>
+        <div class="grade-bars">
+          <div class="bar-row"><div class="bar-label">Joriy</div><div class="bar-track"><div class="bar-fill" style="width:${(g.cur/20)*100}%;background:var(--accent)"></div></div><div class="bar-val">${g.cur}/20</div></div>
+          <div class="bar-row"><div class="bar-label">Oraliq</div><div class="bar-track"><div class="bar-fill" style="width:${(g.mid/30)*100}%;background:var(--purple)"></div></div><div class="bar-val">${g.mid}/30</div></div>
+        </div>
+      </div>
+      ${g.risk ? `<div class="risk-strip">⚠️ Yakuniyda ${g.needed}/50 kerak</div>` : ''}
+    </div>`).join('')}
+  `;
+  setTimeout(() => {
+    new Chart(document.getElementById('radarChart').getContext('2d'), {
+      type: 'radar',
+      data: { labels: DEMO.grades.map(g=>g.s.substring(0,6)+'.'), datasets: [{ data: DEMO.grades.map(g=>g.tot), backgroundColor: 'rgba(10, 132, 255, 0.2)', borderColor: '#0a84ff', borderWidth: 2 }] },
+      options: { scales: { r: { angleLines: {color: 'rgba(255,255,255,0.1)'}, grid: {color: 'rgba(255,255,255,0.1)'}, ticks: {display:false, max:50} } }, plugins:{legend:{display:false}} }
+    });
+  }, 200);
+}
+
+function renderTimetable(c) {
+  const mon = monday(S.curWeekOff); const days = Array.from({length:6}, (_,i) => { const d=new Date(mon); d.setDate(d.getDate()+i); return {i, iso:isoDate(d), short:DAYS_UZ[i]}; });
+  c.innerHTML = `
+    <div class="week-nav"><button class="week-btn" id="pw">‹</button><div class="week-label">Jadval · ${mon.getFullYear()}</div><button class="week-btn" id="nw">›</button></div>
+    <div class="day-tabs">${days.map(d => `<button class="day-tab ${d.i===S.curDayIdx?'active':''}" onclick="haptic(); S.curDayIdx=${d.i}; navigate('timetable')">${d.short}</button>`).join('')}</div>
+    <div class="card">${(DEMO.timetable[days[S.curDayIdx].iso]||[]).map((l,i) => `
+      <div class="lesson-row" style="${i>0?'border-top:1px solid var(--glass-border)':''}">
+        <div class="lesson-num-wrap"><div class="lesson-num-circle" style="background:${COLORS[i]}22;color:${COLORS[i]}">${l.num}</div></div>
+        <div class="lesson-body"><div class="lesson-subject">${l.s}</div><div style="font-size:12px;color:var(--text3)">📍 ${l.room} · 👤 ${l.teacher}</div></div>
+      </div>`).join('') || '<div style="text-align:center;padding:30px;color:var(--text4)">Darslar yo\'q</div>'}
+    </div>`;
+  document.getElementById('pw').onclick = () => { S.curWeekOff--; navigate('timetable'); }; document.getElementById('nw').onclick = () => { S.curWeekOff++; navigate('timetable'); };
+}
+
+function renderNavigator(c) {
+  c.innerHTML = `
+    <div class="nav-tabs-row"><button class="nav-seg-btn ${S.navTab==='rooms'?'active':''}" onclick="S.navTab='rooms';navigate('navigator')">🏛️ Xonalar</button><button class="nav-seg-btn ${S.navTab==='teachers'?'active':''}" onclick="S.navTab='teachers';navigate('navigator')">👨‍🏫 O'qituvchi</button></div>
+    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" placeholder="Qidirish..."></div>
+    <div class="card">
+      ${(S.navTab==='rooms'?DEMO.rooms:DEMO.teachers).map((item, i) => `
+        <div class="room-row" style="${i>0?'border-top:1px solid var(--glass-border)':''}">
+           <div><div style="font-size:15px;font-weight:600">${item.code || item.name}</div><div style="font-size:12px;color:var(--text3)">${item.type || item.dept}</div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── Boot ──
+setTimeout(() => { updateTopbar(); navigate('home'); }, 200);
 </script>
 </body>
 </html>"""
@@ -402,13 +378,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="HELPER TDIU", lifespan=lifespan)
 
 @app.get("/")
-async def root():
-    return {"status":"ok","app":"HELPER TDIU","version":"2.0.0"}
+async def root(): return {"status":"ok","app":"HELPER TDIU"}
 
 @app.get("/health")
-async def health():
-    return {"status":"ok"}
+async def health(): return {"status":"ok"}
 
 @app.get("/app", response_class=HTMLResponse)
-async def mini_app():
-    return MINI_APP_HTML
+async def mini_app(): return MINI_APP_HTML
