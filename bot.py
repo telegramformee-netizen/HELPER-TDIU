@@ -1,5 +1,5 @@
 """
-bot.py - aiogram 3.x bot: barcha handlerlar
+bot.py - aiogram 3.x bot
 """
 import asyncio
 from aiogram import Bot, Dispatcher, Router, F
@@ -20,38 +20,49 @@ from database import AsyncSessionFactory, User, SubscriptionTier
 
 router = Router()
 
-# FSM
 class HemisForm(StatesGroup):
     waiting_id       = State()
     waiting_password = State()
 
-# Klaviaturalar
+
 def main_keyboard(has_hemis=False):
-    btns = [[
-        InlineKeyboardButton(
-            text="🚀 Mini App ochish",
-            web_app=WebAppInfo(url=config.MINI_APP_URL)
-        )
-    ]]
+    btns = []
+
+    # Mini App tugmasi faqat URL mavjud bo'lsa ko'rsatiladi
+    if config.MINI_APP_URL:
+        btns.append([
+            InlineKeyboardButton(
+                text="🚀 Mini App ochish",
+                web_app=WebAppInfo(url=config.MINI_APP_URL)
+            )
+        ])
+
     if not has_hemis:
         btns.append([
             InlineKeyboardButton(text="🔗 Hemis ulash",  callback_data="connect_hemis"),
             InlineKeyboardButton(text="👀 Demo rejim",   callback_data="demo_mode"),
         ])
+
     btns.append([
         InlineKeyboardButton(text="👑 Premium olish", callback_data="buy_premium"),
         InlineKeyboardButton(text="⚙️ Sozlamalar",    callback_data="settings"),
     ])
+
+    btns.append([
+        InlineKeyboardButton(text="📊 Baholar",   callback_data="show_grades"),
+        InlineKeyboardButton(text="📅 Jadval",    callback_data="show_schedule"),
+    ])
+
     return InlineKeyboardMarkup(inline_keyboard=btns)
 
-# /start
+
 @router.message(CommandStart())
 async def cmd_start(msg: Message, state: FSMContext):
     await state.clear()
     tg_id = msg.from_user.id
 
     async with AsyncSessionFactory() as db:
-        res = await db.execute(select(User).where(User.id == tg_id))
+        res  = await db.execute(select(User).where(User.id == tg_id))
         user = res.scalars().first()
         if not user:
             user = User(
@@ -63,43 +74,43 @@ async def cmd_start(msg: Message, state: FSMContext):
             db.add(user)
             await db.commit()
 
-    name      = msg.from_user.first_name or "Talaba"
-    has_hemis = bool(user and user.hemis_id)
-    is_premium = user and user.tier == SubscriptionTier.PREMIUM
+    name       = msg.from_user.first_name or "Talaba"
+    has_hemis  = bool(user and user.hemis_id)
+    is_premium = bool(user and user.tier == SubscriptionTier.PREMIUM)
 
     if is_premium:
-        tier_line = "👑 <b>Premium foydalanuvchi</b>"
+        tier_line = "👑 Premium foydalanuvchi"
     else:
-        tier_line = "💡 <b>Bepul rejim</b> — Premium: 5,000 so'm/oy"
+        tier_line = "Bepul rejim — Premium: 5,000 so'm/oy"
 
-    text = (
+    await msg.answer(
         "🎓 Assalomu alaykum, <b>" + name + "</b>!\n\n"
-        "<b>HELPER TDIU</b> — TDIU talabalari uchun aqlli yordamchi!\n\n"
-        "📊 Baholar va GPA tahlili\n"
+        "<b>HELPER TDIU</b> — TDIU talabalari uchun yordamchi!\n\n"
+        "📊 Baholar va GPA\n"
         "📅 Haftalik dars jadvali\n"
-        "🔔 Har kuni 20:00 da ertangi jadval\n"
-        "⚠️ Qayta topshirish xavfi ogohlantirishi\n"
+        "🔔 Har kuni 20:00 ertangi jadval\n"
+        "⚠️ Qayta topshirish xavfi\n"
         "📍 NB chegarasi kuzatuvi\n"
         "🗺️ Auditoriya navigatori\n\n"
         + tier_line + "\n\n"
-        "👇 Boshlash uchun:"
+        "👇 Boshlash uchun:",
+        reply_markup=main_keyboard(has_hemis)
     )
-    await msg.answer(text, reply_markup=main_keyboard(has_hemis))
 
-# /help
+
 @router.message(Command("help"))
 async def cmd_help(msg: Message):
     await msg.answer(
         "ℹ️ <b>HELPER TDIU — Yordam</b>\n\n"
         "/start — Bosh menyu\n"
-        "/help — Yordam\n"
         "/grades — Baholar\n"
         "/schedule — Bugungi jadval\n"
         "/profile — Profil\n"
-        "/logout — Chiqish"
+        "/logout — Chiqish\n"
+        "/help — Yordam"
     )
 
-# /grades
+
 @router.message(Command("grades"))
 async def cmd_grades(msg: Message):
     tg_id    = msg.from_user.id
@@ -140,33 +151,25 @@ async def cmd_grades(msg: Message):
             cur = str(int(g.current)) if g.current is not None else "—"
             mid = str(int(g.midterm)) if g.midterm is not None else "—"
             fin = str(int(g.final))   if g.final   is not None else "—"
-            tot = round(a.total, 1)   if a.total   is not None else 0
+            tot = str(round(a.total, 1)) if a.total is not None else "—"
 
-            if a.fail_risk:
-                icon = "🔴"
-            elif a.nb_warning:
-                icon = "🟡"
-            else:
-                icon = "🟢"
-
+            icon = "🔴" if a.fail_risk else ("🟡" if a.nb_warning else "🟢")
             letter = (" · " + a.letter) if a.letter else ""
             lines.append(
                 icon + " <b>" + g.subject[:28] + "</b>\n"
-                "   Joriy: " + cur + "/20 · Oraliq: " + mid + "/30 · Yakuniy: " + fin + "/50\n"
-                "   <b>Jami: " + str(tot) + "</b>" + letter
+                "   J:" + cur + "/20  O:" + mid + "/30  Y:" + fin + "/50\n"
+                "   <b>Jami: " + tot + "</b>" + letter
             )
-
             if a.total:
                 total_sum += a.total
                 count += 1
-
             rt = risk_text_uz(a)
             if rt:
                 alerts.append(rt)
 
         if count:
-            gpa = round(total_sum / count / 25, 2)
-            lines.insert(1, "📈 <b>GPA:</b> " + str(gpa) + "/4.0\n")
+            gpa = str(round(total_sum / count / 25, 2))
+            lines.insert(1, "📈 <b>GPA:</b> " + gpa + "/4.0\n")
 
         text = "\n".join(lines)
         if alerts:
@@ -175,11 +178,11 @@ async def cmd_grades(msg: Message):
         await wait_msg.edit_text(text[:4096])
 
     except HemisAuthError as e:
-        await wait_msg.edit_text("❌ Hemis xatosi: " + str(e) + "\n\nQayta: /start")
+        await wait_msg.edit_text("❌ Hemis xatosi: " + str(e))
     except Exception as e:
         await wait_msg.edit_text("❌ Xato: " + str(e))
 
-# /schedule
+
 @router.message(Command("schedule"))
 async def cmd_schedule(msg: Message):
     tg_id = msg.from_user.id
@@ -217,21 +220,19 @@ async def cmd_schedule(msg: Message):
             await wait.edit_text("📅 <b>" + day_name + "</b> — bugun darslar yo'q! 🎉")
             return
 
-        lines = ["📅 <b>Bugungi jadval — " + day_name + "</b>\n"]
+        lines = ["📅 <b>" + day_name + " — bugungi darslar</b>\n"]
         for l in sorted(today, key=lambda x: x.num):
             lines.append(
                 "<b>" + str(l.num) + ". " + l.start + "–" + l.end + "</b>\n"
                 "📚 " + l.subject + "\n"
-                "📍 " + l.room + " (" + l.building + ") · 👤 " + l.teacher + "\n"
-                "🏷 " + l.s_type
+                "📍 " + l.room + " · 👤 " + l.teacher
             )
-
         await wait.edit_text("\n\n".join(lines))
 
     except Exception as e:
         await wait.edit_text("❌ Xato: " + str(e))
 
-# /profile
+
 @router.message(Command("profile"))
 async def cmd_profile(msg: Message):
     tg_id = msg.from_user.id
@@ -243,20 +244,15 @@ async def cmd_profile(msg: Message):
         await msg.answer("❗ Avval /start ni bosing.")
         return
 
-    tier = "👑 Premium" if user.tier == SubscriptionTier.PREMIUM else "Bepul"
-    if user.is_demo:
-        mode = "👀 Demo"
-    elif user.hemis_id:
-        mode = "🔗 Hemis ulangan"
-    else:
-        mode = "❌ Ulanmagan"
-
+    tier  = "👑 Premium" if user.tier == SubscriptionTier.PREMIUM else "Bepul"
+    mode  = "👀 Demo" if user.is_demo else ("🔗 Ulangan" if user.hemis_id else "❌ Ulanmagan")
     notif = "✅" if user.notify_evening else "❌"
+
     await msg.answer(
         "👤 <b>Profil</b>\n\n"
         "Telegram: " + (user.full_name or "—") + "\n"
         "Hemis ID: " + (user.hemis_id or "—") + "\n"
-        "Rejim: " + mode + "\n"
+        "Holat: " + mode + "\n"
         "Obuna: " + tier + "\n"
         "Bildirishnoma: " + notif,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
@@ -264,7 +260,7 @@ async def cmd_profile(msg: Message):
         ]])
     )
 
-# /logout
+
 @router.message(Command("logout"))
 async def cmd_logout(msg: Message, state: FSMContext):
     await state.clear()
@@ -276,18 +272,31 @@ async def cmd_logout(msg: Message, state: FSMContext):
             user.hemis_password_enc = None
             user.is_demo = False
             await db.commit()
-    await msg.answer("✅ Ma'lumotlar o'chirildi. Qayta: /start")
+    await msg.answer("✅ Chiqildi. /start")
 
-# Callbacks
+
+# ── Callbacks ─────────────────────────────────────────────────────────────────
+
+@router.callback_query(F.data == "show_grades")
+async def cq_grades(cq: CallbackQuery):
+    await cq.answer()
+    await cmd_grades(cq.message)
+
+@router.callback_query(F.data == "show_schedule")
+async def cq_schedule(cq: CallbackQuery):
+    await cq.answer()
+    await cmd_schedule(cq.message)
+
 @router.callback_query(F.data == "connect_hemis")
 async def cq_connect(cq: CallbackQuery, state: FSMContext):
     await state.set_state(HemisForm.waiting_id)
     await cq.message.answer(
         "🔗 <b>Hemis'ni ulash</b>\n\n"
         "Hemis ID ingizni kiriting (masalan: U2200001):\n\n"
-        "🔐 Parolingiz AES-256 bilan shifrlanadi."
+        "🔐 Parol AES-256 bilan shifrlanadi."
     )
     await cq.answer()
+
 
 @router.callback_query(F.data == "demo_mode")
 async def cq_demo(cq: CallbackQuery):
@@ -299,24 +308,26 @@ async def cq_demo(cq: CallbackQuery):
             await db.commit()
     await cq.message.answer(
         "👀 <b>Demo rejim yoqildi!</b>\n\n"
-        "Namunali ma'lumotlar ko'rsatiladi.\n\n"
-        "Buyruqlar: /grades · /schedule · /profile"
+        "Namunali ma'lumotlar:\n"
+        "📊 /grades — Baholar\n"
+        "📅 /schedule — Jadval"
     )
-    await cq.answer("Demo rejim yoqildi")
+    await cq.answer("Demo yoqildi")
+
 
 @router.callback_query(F.data == "buy_premium")
 async def cq_premium(cq: CallbackQuery):
     await cq.message.answer(
-        "👑 <b>Premium obuna</b>\n\n"
-        "💰 Narxi: <b>5,000 so'm / oy</b>\n\n"
+        "👑 <b>Premium — 5,000 so'm/oy</b>\n\n"
         "✅ Darhol ball yangilanishi\n"
         "✅ Jadval o'zgarish ogohlantirishlari\n"
         "✅ To'liq GPA analitika\n"
         "✅ O'qituvchi tracker\n"
-        "✅ Reklamasiz interfeys\n\n"
+        "✅ Reklamasiz\n\n"
         "📲 To'lov tizimi tez kunda ulash rejalashtirilgan!"
     )
     await cq.answer()
+
 
 @router.callback_query(F.data == "settings")
 async def cq_settings(cq: CallbackQuery):
@@ -324,12 +335,11 @@ async def cq_settings(cq: CallbackQuery):
         res  = await db.execute(select(User).where(User.id == cq.from_user.id))
         user = res.scalars().first()
     notif = user.notify_evening if user else True
-    notif_text = "✅" if notif else "❌"
     await cq.message.answer(
         "⚙️ <b>Sozlamalar</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
-                text="🔔 Kechki bildirishnoma: " + notif_text,
+                text="🔔 Kechki bildirishnoma: " + ("✅" if notif else "❌"),
                 callback_data="toggle_notify"
             )
         ], [
@@ -338,17 +348,19 @@ async def cq_settings(cq: CallbackQuery):
     )
     await cq.answer()
 
+
 @router.callback_query(F.data == "toggle_notify")
 async def cq_toggle(cq: CallbackQuery):
+    new_state = True
     async with AsyncSessionFactory() as db:
         res  = await db.execute(select(User).where(User.id == cq.from_user.id))
         user = res.scalars().first()
         if user:
             user.notify_evening = not user.notify_evening
-            state = user.notify_evening
+            new_state = user.notify_evening
             await db.commit()
-    msg = "Yoqildi ✅" if state else "O'chirildi ❌"
-    await cq.answer("Bildirishnoma " + msg)
+    await cq.answer("Bildirishnoma " + ("yoqildi ✅" if new_state else "o'chirildi ❌"))
+
 
 @router.callback_query(F.data == "logout")
 async def cq_logout(cq: CallbackQuery, state: FSMContext):
@@ -361,10 +373,12 @@ async def cq_logout(cq: CallbackQuery, state: FSMContext):
             user.hemis_password_enc = None
             user.is_demo = False
             await db.commit()
-    await cq.message.answer("✅ Chiqildi. Qayta: /start")
+    await cq.message.answer("✅ Chiqildi. /start")
     await cq.answer()
 
-# FSM: Hemis ID
+
+# ── FSM ───────────────────────────────────────────────────────────────────────
+
 @router.message(HemisForm.waiting_id)
 async def fsm_id(msg: Message, state: FSMContext):
     hemis_id = msg.text.strip()
@@ -379,7 +393,7 @@ async def fsm_id(msg: Message, state: FSMContext):
         "(Xabar avtomatik o'chiriladi)"
     )
 
-# FSM: Parol
+
 @router.message(HemisForm.waiting_password)
 async def fsm_password(msg: Message, state: FSMContext):
     password = msg.text
@@ -413,21 +427,22 @@ async def fsm_password(msg: Message, state: FSMContext):
 
         await state.clear()
         await wait.edit_text(
-            "✅ <b>Hemis muvaffaqiyatli ulandi!</b>\n\n"
-            "Buyruqlar:\n"
+            "✅ <b>Hemis ulandi!</b>\n\n"
             "📊 /grades — Baholar\n"
-            "📅 /schedule — Bugungi jadval\n"
+            "📅 /schedule — Jadval\n"
             "👤 /profile — Profil"
         )
 
     except HemisAuthError as e:
         await state.clear()
-        await wait.edit_text("❌ Xato: " + str(e) + "\n\nQaytadan: /start")
+        await wait.edit_text("❌ " + str(e) + "\n\nQaytadan: /start")
     except Exception as e:
         await state.clear()
-        await wait.edit_text("❌ Ulanib bo'lmadi: " + str(e) + "\n\nQaytadan: /start")
+        await wait.edit_text("❌ Ulanib bo'lmadi: " + str(e))
 
-# Bot yaratish
+
+# ── Bot ishga tushirish ────────────────────────────────────────────────────────
+
 def create_bot():
     return Bot(
         token=config.BOT_TOKEN,
