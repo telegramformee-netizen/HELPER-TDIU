@@ -618,8 +618,7 @@ function renderHome(c) {
   const todayLessons = DEMO.timetable[todayIso] || [];
 
   const gpaVal = p.gpa ? p.gpa.toFixed(2) : '—';
-  const gpaOf  = p.gpa ? (p.gpa >= 3.5 ? 'A'xcel' : p.gpa >= 3.0 ? 'Yaxshi' : 'Qoniqarli') : '';
-
+ const gpaOf  = p.gpa ? (p.gpa >= 3.5 ? "A'xcel" : p.gpa >= 3.0 ? 'Yaxshi' : 'Qoniqarli') : '';
   c.innerHTML = `
     <!-- GPA Hero -->
     <div class="gpa-hero">
