@@ -1055,3 +1055,226 @@ async def health():
 @app.get("/app", response_class=HTMLResponse)
 async def mini_app():
     return MINI_APP_HTML
+
+
+# ════════════════════════════════════════════════════════
+# REST API — Mini App uchun
+# ════════════════════════════════════════════════════════
+
+from fastapi import Header, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from database import AsyncSessionFactory, User, SubscriptionTier
+from scraper import HemisScraper, HemisAuthError
+from analyzer import analyze, risk_text_uz
+from crypto import encrypt, decrypt
+import json as _json
+
+class HemisConnectRequest(BaseModel):
+    hemis_id: str
+    password: str
+    telegram_id: int
+
+class DemoRequest(BaseModel):
+    telegram_id: int
+
+
+@app.post("/api/connect-hemis")
+async def api_connect_hemis(body: HemisConnectRequest):
+    """
+    Hemis ID va parolni tekshiradi.
+    Muvaffaqiyatli bo'lsa DB ga saqlaydi.
+    """
+    enc_pass = encrypt(body.password)
+
+    try:
+        async with HemisScraper(
+            user_id=body.telegram_id,
+            hemis_id=body.hemis_id,
+            enc_password=enc_pass,
+            demo=False,
+        ) as sc:
+            await sc.ensure_login()
+            profile = await sc.fetch_profile()
+            cookies = await sc.get_cookies_dict()
+
+    except HemisAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Hemis ga ulanib bolmadi: {e}")
+
+    async with AsyncSessionFactory() as db:
+        res = await db.execute(select(User).where(User.id == body.telegram_id))
+        user = res.scalars().first()
+        if not user:
+            user = User(id=body.telegram_id)
+            db.add(user)
+        user.hemis_id = body.hemis_id
+        user.hemis_password_enc = enc_pass
+        user.is_demo = False
+        if profile.full_name and profile.full_name != "Noma'lum":
+            user.full_name = profile.full_name
+        await db.commit()
+
+    return {
+        "success": True,
+        "profile": {
+            "full_name": profile.full_name,
+            "group":     profile.group,
+            "faculty":   profile.faculty,
+            "semester":  profile.semester,
+            "gpa":       profile.gpa,
+        }
+    }
+
+
+@app.post("/api/demo")
+async def api_demo(body: DemoRequest):
+    async with AsyncSessionFactory() as db:
+        res = await db.execute(select(User).where(User.id == body.telegram_id))
+        user = res.scalars().first()
+        if not user:
+            user = User(id=body.telegram_id, is_demo=True)
+            db.add(user)
+        else:
+            user.is_demo = True
+        await db.commit()
+    return {"success": True}
+
+
+@app.get("/api/grades/{telegram_id}")
+async def api_grades(telegram_id: int, semester: str = ""):
+    async with AsyncSessionFactory() as db:
+        res = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    try:
+        async with HemisScraper(
+            telegram_id, user.hemis_id, user.hemis_password_enc,
+            demo=user.is_demo
+        ) as sc:
+            await sc.ensure_login()
+            grades   = await sc.fetch_grades(semester)
+            semesters = await sc.fetch_semesters()
+    except HemisAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    analyses = [analyze(g.subject, g.current, g.midterm, g.final,
+                        g.total_hours, g.missed, g.semester) for g in grades]
+    gpa_sum = sum(a.total for a in analyses if a.total) or 0
+    gpa_cnt = sum(1 for a in analyses if a.total)
+
+    return {
+        "gpa": round(gpa_sum / gpa_cnt / 25, 2) if gpa_cnt else None,
+        "semester": semester,
+        "semesters": semesters,
+        "grades": [
+            {
+                "subject":      g.subject,
+                "current":      g.current,
+                "midterm":      g.midterm,
+                "final":        g.final,
+                "total":        a.total,
+                "total_hours":  g.total_hours,
+                "missed":       g.missed,
+                "fail_risk":    a.fail_risk,
+                "nb_warning":   a.nb_warning,
+                "needed_final": a.needed_final,
+                "attendance":   a.attendance_pct,
+                "letter":       a.letter,
+            }
+            for g, a in zip(grades, analyses)
+        ]
+    }
+
+
+@app.get("/api/schedule/{telegram_id}")
+async def api_schedule(telegram_id: int, week: str = ""):
+    async with AsyncSessionFactory() as db:
+        res = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    from datetime import date
+    target = date.today()
+    if week:
+        try:
+            target = date.fromisoformat(week)
+        except Exception:
+            pass
+
+    try:
+        async with HemisScraper(
+            telegram_id, user.hemis_id, user.hemis_password_enc,
+            demo=user.is_demo
+        ) as sc:
+            await sc.ensure_login()
+            lessons = await sc.fetch_schedule(target)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    by_date: dict = {}
+    for l in lessons:
+        by_date.setdefault(l.date, []).append({
+            "num": l.num, "start": l.start, "end": l.end,
+            "subject": l.subject, "type": l.s_type,
+            "teacher": l.teacher, "room": l.room, "building": l.building,
+        })
+
+    return {"week": target.isoformat(), "days": by_date}
+
+
+# ── Debug endpoint (faqat development uchun) ──────────────────
+@app.get("/api/debug-hemis/{telegram_id}")
+async def debug_hemis(telegram_id: int, path: str = "/dashboard"):
+    """
+    Real Hemis HTML strukturasini ko'rish uchun.
+    Browser da: https://your-app.railway.app/api/debug-hemis/YOUR_TG_ID?path=/student/performance
+    """
+    async with AsyncSessionFactory() as db:
+        res = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+
+    if not user or not user.hemis_id:
+        return {"error": "Foydalanuvchi yoki Hemis ID topilmadi"}
+
+    try:
+        async with HemisScraper(
+            telegram_id, user.hemis_id, user.hemis_password_enc, demo=False
+        ) as sc:
+            await sc.ensure_login()
+            html = await sc.fetch_raw_html(path)
+
+        # HTML ni analiz qilamiz
+        soup = BeautifulSoup(html, "html.parser")
+        from fastapi.responses import JSONResponse
+
+        tables = []
+        for t in soup.find_all("table")[:5]:
+            rows = []
+            for row in t.find_all("tr")[:5]:
+                rows.append([td.get_text(strip=True)[:50] for td in row.find_all(["td","th"])])
+            tables.append(rows)
+
+        return JSONResponse({
+            "url_fetched": path,
+            "title": soup.title.string if soup.title else "",
+            "headings": [h.get_text(strip=True) for h in soup.find_all(["h1","h2","h3"])[:10]],
+            "tables_found": len(soup.find_all("table")),
+            "table_preview": tables,
+            "forms": [{"action": f.get("action"), "fields": [i.get("name") for i in f.find_all("input")]}
+                      for f in soup.find_all("form")[:3]],
+            "raw_html_snippet": html[:3000],
+        })
+    except Exception as e:
+        return {"error": str(e)}
+
+
+from bs4 import BeautifulSoup
