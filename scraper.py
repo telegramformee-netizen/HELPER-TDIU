@@ -196,7 +196,75 @@ class HemisScraper:
         except:
             return False
 
-    async def _login(self):
+    async def _solve_captcha(self, soup: "BeautifulSoup") -> tuple[str, str]:
+        """
+        Captcha rasmini topib, OCR bilan o'qiydi.
+        (field_name, captcha_text) qaytaradi.
+        Captcha bo'lmasa ("", "") qaytaradi.
+        """
+        import io
+        from PIL import Image, ImageFilter, ImageOps
+        import pytesseract
+
+        # Captcha input fieldini topamiz
+        captcha_field = ""
+        captcha_img_url = ""
+
+        for inp in soup.find_all("input"):
+            name = inp.get("name", "")
+            iid  = inp.get("id", "").lower()
+            if any(x in name.lower() for x in ["captcha", "verifycode", "verify", "code"]):
+                captcha_field = name
+                break
+            if any(x in iid for x in ["captcha", "verifycode", "verify"]):
+                captcha_field = name or iid
+                break
+
+        if not captcha_field:
+            return "", ""
+
+        # Captcha rasmini topamiz
+        for img in soup.find_all("img"):
+            src = img.get("src", "")
+            if any(x in src.lower() for x in ["captcha", "verifycode", "verify"]):
+                captcha_img_url = src
+                break
+
+        if not captcha_img_url:
+            return captcha_field, ""
+
+        # URL ni to'liq qilamiz
+        if captcha_img_url.startswith("/"):
+            captcha_img_url = self._base + captcha_img_url
+
+        # Rasmni yuklaymiz
+        try:
+            async with self._session.get(captcha_img_url) as r:
+                img_bytes = await r.read()
+        except Exception:
+            return captcha_field, ""
+
+        # OCR bilan o'qiymiz
+        try:
+            img = Image.open(io.BytesIO(img_bytes)).convert("L")
+            # Kontrastni oshiramiz
+            img = ImageOps.autocontrast(img, cutoff=5)
+            img = img.filter(ImageFilter.SHARPEN)
+            # Threshold — oq-qora
+            img = img.point(lambda p: 255 if p > 140 else 0)
+            # Scale up for better OCR
+            w, h = img.size
+            img = img.resize((w * 3, h * 3), Image.LANCZOS)
+
+            text = pytesseract.image_to_string(
+                img,
+                config="--psm 8 --oem 3 -c tessedit_char_whitelist=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            ).strip().replace(" ", "").replace("\n", "")
+            return captcha_field, text
+        except Exception:
+            return captcha_field, ""
+
+    async def _login(self, attempt: int = 1):
         from crypto import decrypt
         password = decrypt(self._enc_pass)
 
@@ -207,8 +275,7 @@ class HemisScraper:
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # ── Qadam 2: Barcha inputlarni topamiz ──────────────────
-        # CSRF token — turli nomlar bilan kelishi mumkin
+        # ── Qadam 2: CSRF token ──────────────────────────────────
         csrf_name  = "_csrf-frontend"
         csrf_token = ""
 
@@ -226,19 +293,21 @@ class HemisScraper:
         remember_field = "LoginForm[rememberMe]"
 
         for inp in soup.find_all("input"):
-            inp_name = inp.get("name","")
-            inp_type = inp.get("type","")
-            inp_id   = inp.get("id","").lower()
+            inp_name = inp.get("name", "")
+            inp_type = inp.get("type", "")
+            inp_id   = inp.get("id", "").lower()
 
-            if inp_type == "text" or "username" in inp_id or "login" in inp_id:
-                if inp_name and "csrf" not in inp_name.lower():
+            if inp_type in ("text", "email") or "username" in inp_id or "login" in inp_id:
+                if inp_name and "csrf" not in inp_name.lower() and "captcha" not in inp_name.lower():
                     username_field = inp_name
 
-            if inp_type == "password":
-                if inp_name:
-                    password_field = inp_name
+            if inp_type == "password" and inp_name:
+                password_field = inp_name
 
-        # ── Qadam 4: Login so'rovini yuboramiz ───────────────────
+        # ── Qadam 4: Captcha ─────────────────────────────────────
+        captcha_field, captcha_text = await self._solve_captcha(soup)
+
+        # ── Qadam 5: Form data yig'amiz ──────────────────────────
         form_data = {
             username_field: self.hemis_id,
             password_field: password,
@@ -246,11 +315,14 @@ class HemisScraper:
         if csrf_token:
             form_data[csrf_name] = csrf_token
 
-        # rememberMe qo'shamiz
+        if captcha_field and captcha_text:
+            form_data[captcha_field] = captcha_text
+
+        # rememberMe
         for inp in soup.find_all("input", {"type": "checkbox"}):
-            name = inp.get("name","")
-            if "remember" in name.lower() or "remember" in inp.get("id","").lower():
-                form_data[name] = inp.get("value","1")
+            name = inp.get("name", "")
+            if "remember" in name.lower() or "remember" in inp.get("id", "").lower():
+                form_data[name] = inp.get("value", "1")
                 break
         else:
             if remember_field not in form_data:
@@ -264,9 +336,8 @@ class HemisScraper:
             final_url = str(r.url)
             body      = await r.text()
 
-        # ── Qadam 5: Login natijasini tekshiramiz ────────────────
+        # ── Qadam 6: Login natijasini tekshiramiz ────────────────
         if "/dashboard/login" in final_url:
-            # Xato xabarini topamiz
             err_soup = BeautifulSoup(body, "html.parser")
             err_el   = err_soup.select_one(
                 ".alert-danger, .help-block, .error, "
@@ -274,11 +345,21 @@ class HemisScraper:
             )
             err_msg = err_el.get_text(strip=True) if err_el else ""
 
+            # Captcha xatosi — qayta urinib ko'ramiz (max 4 marta)
+            is_captcha_err = any(
+                x in err_msg.lower()
+                for x in ["captcha", "verify", "kod", "tasdiqlash", "tekshir"]
+            )
+            if is_captcha_err or (captcha_field and not captcha_text):
+                if attempt < 4:
+                    await asyncio.sleep(0.5)
+                    return await self._login(attempt + 1)
+
             raise HemisAuthError(
                 "Login muvaffaqiyatsiz!\n\n"
                 + (f"Sabab: {err_msg}\n\n" if err_msg else "")
-                + "talaba.tsue.uz dagi login va parolingizni kiriting.\n"
-                "Login — o'quvchilik ID raqamingiz (masalan: 123456789)"
+                + "talaba.tsue.uz dagi login va parolingizni tekshiring.\n"
+                "Login — o'quvchilik ID raqamingiz (masalan: 324241104710)"
             )
 
     async def _get(self, path: str, attempt: int = 1) -> str:
