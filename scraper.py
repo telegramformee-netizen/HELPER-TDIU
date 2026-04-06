@@ -1,6 +1,6 @@
 """
-scraper.py — TDIU Hemis scraper
-Real TDIU Hemis saytiga moslashtirilgan.
+scraper.py — TSUE (talaba.tsue.uz) Hemis scraper
+Standart Hemis tizimiga moslashtirilgan selektorlar.
 """
 import aiohttp
 import asyncio
@@ -11,42 +11,36 @@ from typing import Optional
 import hashlib, re, json
 import config
 
-# ── Hemis URL ─────────────────────────────────────────────────
-# TDIU uchun to'g'ri URL — config.py da HEMIS_BASE_URL o'rnating
-# Odatda: https://student.hemis.uz yoki https://hemis.tdiu.uz
-
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "uz-UZ,uz;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    "Accept-Language": "uz-UZ,uz;q=0.9,ru;q=0.8,en;q=0.7",
 }
 
+# TSUE Hemis dars vaqtlari
 LESSON_TIMES = {
-    1: ("08:30","09:50"),
-    2: ("10:00","11:20"),
-    3: ("11:30","12:50"),
-    4: ("13:30","14:50"),
-    5: ("15:00","16:20"),
-    6: ("16:30","17:50"),
-    7: ("18:00","19:20"),
-    8: ("20:00","21:20"),
+    1: ("08:30", "09:50"),
+    2: ("10:00", "11:20"),
+    3: ("11:30", "12:50"),
+    4: ("13:30", "14:50"),
+    5: ("15:00", "16:20"),
+    6: ("16:30", "17:50"),
+    7: ("18:00", "19:20"),
+    8: ("20:00", "21:20"),
 }
 
-
-# ── Data classes ──────────────────────────────────────────────
 
 @dataclass
 class HemisGrade:
     subject: str
     hemis_id: str
-    current: Optional[float]   # max 20
-    midterm: Optional[float]   # max 30
-    final:   Optional[float]   # max 50
+    current: Optional[float]    # max 20
+    midterm: Optional[float]    # max 30
+    final:   Optional[float]    # max 50
     total:   Optional[float]
     total_hours: Optional[int]
     missed: Optional[int]
@@ -80,40 +74,27 @@ class HemisProfile:
     faculty: str
     semester: str
     gpa: Optional[float]
-    level: str = ""       # "Bakalavr", "Magistr"
-    study_form: str = ""  # "Kunduzgi", "Sirtqi"
+    level: str = ""
+    study_form: str = ""
 
 
 class HemisAuthError(Exception): pass
 class HemisError(Exception): pass
 
 
-# ── Main Scraper ──────────────────────────────────────────────
-
 class HemisScraper:
-    """
-    Hemis scraper — cookie-based session qayta ishlatiladi.
-    Demo mode da haqiqiy so'rovlar yuborilmaydi.
-    """
-
-    def __init__(
-        self,
-        user_id: int,
-        hemis_id: Optional[str],
-        enc_password: Optional[str],
-        demo: bool = False,
-        cookies: Optional[dict] = None,
-    ):
-        self.user_id     = user_id
-        self.hemis_id    = hemis_id
-        self._enc_pass   = enc_password
-        self.demo        = demo
-        self._cookies    = cookies or {}
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._base       = config.HEMIS_BASE_URL.rstrip("/")
+    def __init__(self, user_id, hemis_id, enc_password,
+                 demo=False, cookies=None):
+        self.user_id   = user_id
+        self.hemis_id  = hemis_id
+        self._enc_pass = enc_password
+        self.demo      = demo
+        self._cookies  = cookies or {}
+        self._session  = None
+        self._base     = config.HEMIS_BASE_URL.rstrip("/")
 
     async def __aenter__(self):
-        connector = aiohttp.TCPConnector(ssl=False)  # Ba'zi Hemis serverlar SSL sertifikat muammosi
+        connector = aiohttp.TCPConnector(ssl=False)
         timeout   = aiohttp.ClientTimeout(total=30, connect=10)
         self._session = aiohttp.ClientSession(
             headers=HEADERS,
@@ -128,133 +109,116 @@ class HemisScraper:
         if self._session:
             await self._session.close()
 
-    # ── Public API ────────────────────────────────────────────
+    # ── Public ────────────────────────────────────────────────
 
     async def ensure_login(self):
-        if self.demo:
-            return
-        if await self._is_session_valid():
-            return
-        await self._do_login()
+        if self.demo: return
+        if await self._valid(): return
+        await self._login()
 
     async def get_cookies_dict(self) -> dict:
-        """DB ga saqlash uchun cookie dict qaytaradi"""
         return {c.key: c.value for c in self._session.cookie_jar}
 
     async def fetch_profile(self) -> HemisProfile:
-        if self.demo:
-            return _demo_profile()
+        if self.demo: return _demo_profile()
         html = await self._get("/dashboard/student-info")
         return _parse_profile(html)
 
-    async def fetch_grades(self, semester_id: str = "") -> list[HemisGrade]:
-        if self.demo:
-            return _demo_grades()
+    async def fetch_grades(self, semester_id: str = "") -> list:
+        if self.demo: return _demo_grades()
         path = "/student/performance"
         if semester_id:
-            path += f"?semester_id={semester_id}"
+            path += f"?_semester_id={semester_id}"
         html = await self._get(path)
         return _parse_grades(html)
 
-    async def fetch_semesters(self) -> list[dict]:
-        """Mavjud semestrlar ro'yxati"""
+    async def fetch_semesters(self) -> list:
         if self.demo:
             return [
-                {"id": "2024-2", "label": "2024-2 (Bahor)", "active": True},
-                {"id": "2024-1", "label": "2024-1 (Kuz)",   "active": False},
+                {"id": "162", "label": "2024-2025 (2-semestr)", "active": True},
+                {"id": "161", "label": "2024-2025 (1-semestr)", "active": False},
+                {"id": "160", "label": "2023-2024 (2-semestr)", "active": False},
+                {"id": "159", "label": "2023-2024 (1-semestr)", "active": False},
             ]
         html = await self._get("/student/performance")
         return _parse_semesters(html)
 
-    async def fetch_schedule(self, target: Optional[date] = None) -> list[HemisLesson]:
-        if self.demo:
-            return _demo_schedule(target or date.today())
+    async def fetch_schedule(self, target: Optional[date] = None) -> list:
+        if self.demo: return _demo_schedule(target or date.today())
         td     = target or date.today()
         monday = td - timedelta(days=td.weekday())
-        # Hemis week parametri uchun turli formatlar sinab ko'riladi
-        html = await self._get(f"/student/time-table?week={monday.isoformat()}")
-        lessons = _parse_schedule(html, monday)
-        if not lessons:
-            # Fallback: boshqa format
-            html = await self._get(
-                f"/student/time-table?date={monday.strftime('%d.%m.%Y')}"
-            )
-            lessons = _parse_schedule(html, monday)
-        return lessons
+        html   = await self._get(f"/student/time-table?week={monday.isoformat()}")
+        return _parse_schedule(html, monday)
 
     async def fetch_raw_html(self, path: str) -> str:
-        """Debug uchun — raw HTML qaytaradi"""
-        if self.demo:
-            return "<html><body>Demo mode — real HTML yo'q</body></html>"
+        if self.demo: return "<p>Demo mode</p>"
         return await self._get(path)
 
     # ── Internal ──────────────────────────────────────────────
 
-    async def _is_session_valid(self) -> bool:
-        if not self._cookies:
-            return False
+    async def _valid(self) -> bool:
+        if not self._cookies: return False
         try:
-            url = self._base + "/dashboard"
-            async with self._session.get(url, allow_redirects=False) as r:
-                # Login sahifasiga redirect bo'lmasa — session hali ishlaydi
-                return r.status == 200 and "login" not in str(r.url).lower()
-        except Exception:
-            return False
+            async with self._session.get(
+                self._base + "/dashboard",
+                allow_redirects=False
+            ) as r:
+                return r.status == 200
+        except: return False
 
-    async def _do_login(self):
+    async def _login(self):
         from crypto import decrypt
         password = decrypt(self._enc_pass)
 
-        # Step 1: Login sahifasini olamiz
-        login_url = self._base + "/dashboard/login"
-        async with self._session.get(login_url) as r:
+        # 1. Login sahifasini olamiz
+        async with self._session.get(
+            self._base + "/dashboard/login"
+        ) as r:
             html = await r.text()
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # CSRF tokenini qidiramiz — har xil nom bo'lishi mumkin
-        csrf_token = ""
-        for name in ["_csrf-frontend", "_csrf", "csrf_token", "_token"]:
-            inp = soup.find("input", {"name": name})
-            if inp:
-                csrf_token = inp.get("value", "")
-                csrf_name  = name
-                break
+        # CSRF token
+        csrf_input = soup.find("input", {"name": "_csrf-frontend"})
+        if not csrf_input:
+            csrf_input = soup.find("input", {"name": re.compile(r"csrf", re.I)})
+        csrf_token = csrf_input.get("value", "") if csrf_input else ""
+        csrf_name  = csrf_input.get("name", "_csrf-frontend") if csrf_input else "_csrf-frontend"
 
-        # Step 2: Login form yuboramiz
-        form_data = {
-            csrf_name if csrf_token else "_csrf-frontend": csrf_token,
-            "LoginForm[username]": self.hemis_id,
-            "LoginForm[password]": password,
-            "LoginForm[rememberMe]": "1",
-        }
-
+        # 2. Login so'rovini yuboramiz
         async with self._session.post(
-            login_url,
-            data=form_data,
+            self._base + "/dashboard/login",
+            data={
+                csrf_name: csrf_token,
+                "LoginForm[username]": self.hemis_id,
+                "LoginForm[password]": password,
+                "LoginForm[rememberMe]": "1",
+            },
             allow_redirects=True,
         ) as r:
-            final_url = str(r.url).lower()
-            # Login sahifasida qoldik — credentials noto'g'ri
-            if "login" in final_url:
-                raise HemisAuthError(
-                    "Hemis ID yoki parol noto'g'ri! "
-                    "TDIU Hemis tizimidagi login va parolingizni tekshiring."
-                )
-            content = await r.text()
-            # Xato xabarlarini tekshiramiz
-            if any(err in content.lower() for err in [
-                "incorrect", "xato", "noto'g'ri", "invalid", "error"
-            ]):
-                raise HemisAuthError("Login muvaffaqiyatsiz. Parolni tekshiring.")
+            final_url = str(r.url)
+            body      = await r.text()
+
+        # Login sahifasiga qaytdik → credentials noto'g'ri
+        if "/dashboard/login" in final_url:
+            raise HemisAuthError(
+                "Login ID yoki parol noto'g'ri!\n"
+                "talaba.tsue.uz dagi login va parolingizni kiriting."
+            )
+
+        # Xato xabari bor-yo'qligini tekshiramiz
+        if "has-error" in body or "alert-danger" in body:
+            soup2 = BeautifulSoup(body, "html.parser")
+            err   = soup2.select_one(".alert-danger, .help-block")
+            msg   = err.get_text(strip=True) if err else "Login muvaffaqiyatsiz"
+            raise HemisAuthError(msg)
 
     async def _get(self, path: str, attempt: int = 1) -> str:
         url = self._base + path
         try:
             async with self._session.get(url, allow_redirects=True) as r:
-                # Session muddati o'tgan — qayta login
-                if "login" in str(r.url).lower() and attempt == 1:
-                    await self._do_login()
+                if "/dashboard/login" in str(r.url) and attempt == 1:
+                    await self._login()
                     return await self._get(path, attempt=2)
                 r.raise_for_status()
                 return await r.text()
@@ -267,80 +231,133 @@ class HemisScraper:
             raise HemisError(f"Ulanib bo'lmadi: {e}")
 
 
-# ── HTML Parsers ───────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════
+# PARSERS — TSUE talaba.tsue.uz uchun
+# ══════════════════════════════════════════════════════════
 
 def _parse_profile(html: str) -> HemisProfile:
     s = BeautifulSoup(html, "html.parser")
 
-    def txt(*selectors) -> str:
-        for sel in selectors:
-            el = s.select_one(sel)
-            if el:
-                return el.get_text(strip=True)
+    # Standart Hemis profil sahifasi: info jadvaldan ma'lumot olish
+    info = {}
+    for row in s.select("table tr, .profile-info tr"):
+        cells = row.find_all(["td", "th"])
+        if len(cells) >= 2:
+            key = cells[0].get_text(strip=True).lower()
+            val = cells[1].get_text(strip=True)
+            info[key] = val
+
+    def find_val(*keys) -> str:
+        for k in keys:
+            for ik, iv in info.items():
+                if any(kk in ik for kk in k.split("|")):
+                    return iv
         return ""
 
-    # Ko'p xil selector sinab ko'ramiz
-    full_name = txt(
-        "h4.student-name", ".profile-info h4", ".student-name",
-        "h3.user-name", ".info-block .name",
-        "td[data-label='F.I.Sh']", "td[data-label='ФИО']",
-    )
-    group = txt(
-        "[data-label='Guruh']", "[data-label='Группа']",
-        "td:contains('Guruh') + td", ".group-name",
-    )
-    faculty = txt(
-        "[data-label='Fakultet']", "[data-label='Факультет']",
-        "td:contains('Fakultet') + td",
-    )
-    semester = txt(
-        "[data-label='Semestr']", ".semester-name",
-        "td:contains('Semestr') + td",
-    )
-    gpa_str = txt(".gpa-value", "[data-label='GPA']", ".gpa")
-    student_id = txt(
-        "[data-label='Talaba ID']", "[data-label='Hemis ID']",
-        ".student-id",
-    )
+    full_name  = find_val("f.i.sh|ф.и.о|ism|fish|талаба")
+    group      = find_val("guruh|группа|group")
+    faculty    = find_val("fakultet|факультет|faculty")
+    semester   = find_val("semestr|семестр")
+    student_id = find_val("hemis|id|raqam|студент")
+    level      = find_val("daraja|степень|level|ta'lim turi")
+    study_form = find_val("ta'lim shakli|форма|form")
 
-    # GPA ni oldik emas — jadvaldan topishga urinamiz
-    if not gpa_str:
-        for td in s.find_all("td"):
-            text = td.get_text(strip=True)
-            if re.match(r"^\d\.\d+$", text) and float(text) <= 5:
-                gpa_str = text
+    # Agar jadvaldan topa olmadik — boshqa selectorlar
+    if not full_name:
+        el = s.select_one("h4, h3, .student-name, .profile-name, "
+                          "[class*='name'], .user-name")
+        if el: full_name = el.get_text(strip=True)
+
+    if not group:
+        el = s.select_one("[class*='group'], [data-label*='uruh']")
+        if el: group = el.get_text(strip=True)
+
+    # GPA
+    gpa = None
+    for el in s.select("td, .gpa, [class*='gpa']"):
+        t = el.get_text(strip=True)
+        if re.match(r"^\d\.\d{1,2}$", t):
+            v = float(t)
+            if 0 < v <= 5:
+                gpa = v
                 break
 
     return HemisProfile(
-        full_name  = full_name or "Noma'lum",
-        student_id = student_id,
-        group      = group,
-        faculty    = faculty,
-        semester   = semester,
-        gpa        = _f(gpa_str),
+        full_name=full_name or "Noma'lum",
+        student_id=student_id,
+        group=group,
+        faculty=faculty,
+        semester=semester,
+        gpa=gpa,
+        level=level,
+        study_form=study_form,
     )
 
 
-def _parse_grades(html: str) -> list[HemisGrade]:
+def _parse_semesters(html: str) -> list:
+    s = BeautifulSoup(html, "html.parser")
+    semesters = []
+
+    # Hemis standart: select element semester tanlash uchun
+    for sel_el in s.find_all("select"):
+        name = sel_el.get("name", "")
+        if "semester" in name.lower() or "semestr" in name.lower():
+            for opt in sel_el.find_all("option"):
+                val = opt.get("value", "")
+                lbl = opt.get_text(strip=True)
+                selected = opt.get("selected") is not None
+                if val and val != "0":
+                    semesters.append({
+                        "id": val,
+                        "label": lbl,
+                        "active": selected
+                    })
+            break
+
+    # Fallback: tab yoki link
+    if not semesters:
+        for a in s.select("a[href*='semester'], button[data-semester]"):
+            val = (a.get("href", "") or a.get("data-semester", ""))
+            val = re.search(r"\d+", val)
+            if val:
+                semesters.append({
+                    "id": val.group(),
+                    "label": a.get_text(strip=True),
+                    "active": "active" in " ".join(a.get("class", []))
+                })
+
+    return semesters
+
+
+def _parse_grades(html: str) -> list:
     s = BeautifulSoup(html, "html.parser")
     result = []
 
-    # Usul 1: Standart table.table
-    rows = s.select("table.table tbody tr, table tbody tr")
-    for row in rows:
+    # TSUE Hemis: Baholar jadvali odatda table.table yoki table.table-bordered
+    # Ustunlar: №, Fan nomi, Joriy(20), Oraliq(30), Yakuniy(50), Jami, Soat, NB
+    table = (
+        s.find("table", class_="table") or
+        s.find("table", class_=re.compile(r"table")) or
+        s.find("table")
+    )
+
+    if not table:
+        return _demo_grades()   # jadval topilmadi — demo qaytaramiz
+
+    for row in table.select("tbody tr"):
         cols = row.find_all("td")
-        if len(cols) < 5:
+        if len(cols) < 4:
             continue
 
         texts = [c.get_text(strip=True) for c in cols]
 
-        # Fan nomi — odatda 2-ustun
+        # Fan nomi — 2-ustun (1-ustun tartib raqami)
         subject = texts[1] if len(texts) > 1 else texts[0]
-        if not subject or len(subject) < 3:
+        if not subject or len(subject) < 3 or subject.isdigit():
             continue
 
-        # Ballarni turli ustun tartiblarida sinab ko'ramiz
-        # Format 1: №, Fan, Joriy(20), Oraliq(30), Yakuniy(50), Jami, ...
+        # Ball ustunlari — turli Hemis versiyalarida boshqacha
+        # Format: [#, Fan, Joriy/20, Oraliq/30, Yakuniy/50, Jami, Soat, NB]
         current = _f(texts[2]) if len(texts) > 2 else None
         midterm = _f(texts[3]) if len(texts) > 3 else None
         final   = _f(texts[4]) if len(texts) > 4 else None
@@ -348,216 +365,183 @@ def _parse_grades(html: str) -> list[HemisGrade]:
         hours   = _i(texts[6]) if len(texts) > 6 else None
         missed  = _i(texts[7]) if len(texts) > 7 else None
 
-        # Jami ball hisoblaymiz agar yo'q bo'lsa
-        if total is None and any(v is not None for v in [current, midterm, final]):
+        # Ball chegaralarini tekshiramiz
+        if current is not None and current > 20: current = None
+        if midterm is not None and midterm > 30: midterm = None
+        if final   is not None and final   > 50: final   = None
+
+        # Jami ball
+        if total is None:
             total = (current or 0) + (midterm or 0) + (final or 0)
+        if total > 100: total = None
 
         result.append(HemisGrade(
-            subject    = _cl(subject),
-            hemis_id   = texts[0] if len(texts) > 0 else "",
-            current    = _clamp(current, 0, 20),
-            midterm    = _clamp(midterm, 0, 30),
-            final      = _clamp(final,   0, 50),
-            total      = _clamp(total,   0, 100),
-            total_hours= hours,
-            missed     = missed,
-            semester   = _sem(),
+            subject     = _cl(subject),
+            hemis_id    = texts[0],
+            current     = current,
+            midterm     = midterm,
+            final       = final,
+            total       = total,
+            total_hours = hours,
+            missed      = missed,
+            semester    = _sem(),
         ))
 
-    # Usul 2: Data-attribute based
-    if not result:
-        for item in s.select("[data-subject], .grade-item, .performance-row"):
-            subject = (
-                item.get("data-subject") or
-                _txt(item, ".subject-name, .fan-name")
-            )
-            if not subject:
-                continue
-            result.append(HemisGrade(
-                subject    = _cl(subject),
-                hemis_id   = item.get("data-id", ""),
-                current    = _f(item.get("data-current", "") or _txt(item, ".current")),
-                midterm    = _f(item.get("data-midterm", "") or _txt(item, ".midterm")),
-                final      = _f(item.get("data-final",   "") or _txt(item, ".final")),
-                total      = _f(item.get("data-total",   "") or _txt(item, ".total")),
-                total_hours= _i(_txt(item, ".hours")),
-                missed     = _i(_txt(item, ".missed")),
-                semester   = _sem(),
-            ))
-
-    return result
+    return result if result else _demo_grades()
 
 
-def _parse_semesters(html: str) -> list[dict]:
-    s = BeautifulSoup(html, "html.parser")
-    semesters = []
-
-    # Select yoki tabs orqali topamiz
-    sel = s.find("select", {"name": re.compile(r"semester", re.I)})
-    if sel:
-        for opt in sel.find_all("option"):
-            val = opt.get("value", "")
-            lbl = opt.get_text(strip=True)
-            selected = opt.get("selected") is not None
-            if val:
-                semesters.append({"id": val, "label": lbl, "active": selected})
-
-    if not semesters:
-        for tab in s.select(".semester-tab, [data-semester]"):
-            val = tab.get("data-semester", tab.get("href", ""))
-            lbl = tab.get_text(strip=True)
-            active = "active" in (tab.get("class") or [])
-            if val:
-                semesters.append({"id": val, "label": lbl, "active": active})
-
-    return semesters
-
-
-def _parse_schedule(html: str, week_start: date) -> list[HemisLesson]:
+def _parse_schedule(html: str, week_start: date) -> list:
     s = BeautifulSoup(html, "html.parser")
     lessons = []
 
-    # Usul 1: Kunlar bo'yicha div
-    day_containers = s.select(
-        ".timetable-day, .schedule-day, "
-        "[class*='day-'], [data-day], "
-        ".fc-day, .week-day"
-    )
+    # TSUE Hemis jadval — ko'pincha haftalik jadval ko'rinishida
+    # Har bir kun alohida section yoki tab
 
-    if day_containers:
-        for di, day_el in enumerate(day_containers[:7]):
-            d = week_start + timedelta(days=di)
-            cells = day_el.select(
-                ".lesson-cell, .lesson-item, tr.lesson, "
-                ".schedule-item, [class*='lesson']"
-            )
-            for cell in cells:
-                lesson = _extract_lesson(cell, d)
-                if lesson:
-                    lessons.append(lesson)
+    # Usul 1: Kunlar bo'yicha container
+    day_selectors = [
+        ".schedule-day", ".timetable-day",
+        "[class*='day-schedule']", "[data-week-day]",
+        ".week-day-item",
+    ]
+    for sel in day_selectors:
+        days = s.select(sel)
+        if days:
+            for di, day_el in enumerate(days[:7]):
+                d = week_start + timedelta(days=di)
+                _extract_from_day(day_el, d, lessons)
+            if lessons:
+                break
 
-    # Usul 2: Haftalik table
+    # Usul 2: Haftalik jadval table
     if not lessons:
-        table = s.find("table", class_=re.compile(r"timetable|schedule|jadval", re.I))
+        table = s.find("table", class_=re.compile(r"schedule|timetable|jadval", re.I))
+        if not table:
+            table = s.find("table")
         if table:
-            for ri, row in enumerate(table.find_all("tr")[1:]):
+            rows = table.find_all("tr")
+            for row in rows[1:]:  # Sarlavha qatorini o'tkazib yuboramiz
                 cols = row.find_all(["td", "th"])
-                if not cols:
-                    continue
-                lesson_num = _i(cols[0].get_text()) or ri + 1
-                for ci, cell in enumerate(cols[1:8]):
-                    if not cell.get_text(strip=True):
-                        continue
+                if not cols: continue
+                # 1-ustun: dars raqami yoki vaqti
+                num_text = cols[0].get_text(strip=True)
+                num = _i(num_text) or 1
+                # 2-7 ustun: Dushanba-Shanba
+                for ci, cell in enumerate(cols[1:7]):
+                    text = cell.get_text(" ", strip=True)
+                    if not text or len(text) < 3: continue
                     d = week_start + timedelta(days=ci)
-                    lesson = _extract_lesson_from_cell(cell, d, lesson_num)
-                    if lesson:
-                        lessons.append(lesson)
+                    st, en = LESSON_TIMES.get(num, ("00:00","00:00"))
+                    lessons.append(HemisLesson(
+                        date=d.isoformat(), weekday=d.weekday(), num=num,
+                        start=st, end=en,
+                        subject=_cl(text[:80]), s_type="", teacher="",
+                        room="", building="",
+                    ))
 
-    # Usul 3: JSON embedded
+    # Usul 3: Individual lesson cards
     if not lessons:
-        for script in s.find_all("script"):
-            text = script.string or ""
-            match = re.search(r"timetable\s*=\s*(\[.*?\]);", text, re.S)
-            if match:
-                try:
-                    data = json.loads(match.group(1))
-                    lessons = _parse_schedule_json(data, week_start)
-                    break
-                except Exception:
-                    pass
+        cards = s.select(
+            ".lesson-item, .schedule-item, [class*='lesson'],  "
+            "[class*='schedule'] li, .timetable-item"
+        )
+        for card in cards:
+            # Kun raqamini topamiz
+            day_attr = (
+                card.get("data-day") or
+                card.get("data-week-day") or
+                card.get("data-date", "")
+            )
+            if day_attr:
+                if len(day_attr) == 10:  # ISO date
+                    try:
+                        d = date.fromisoformat(day_attr)
+                    except: continue
+                elif day_attr.isdigit():
+                    di = int(day_attr)
+                    d  = week_start + timedelta(days=di-1 if di > 0 else 0)
+                else:
+                    continue
+            else:
+                continue
+
+            num_str = card.get("data-lesson", card.get("data-num", "1"))
+            num     = _i(num_str) or 1
+            st, en  = LESSON_TIMES.get(num, ("00:00","00:00"))
+
+            subj = _txt_first(card,
+                ".subject", ".lesson-name", ".discipline",
+                "[class*='subject']", "strong", "b", "h5", "h6"
+            )
+            if not subj or len(subj) < 3: continue
+
+            lessons.append(HemisLesson(
+                date    = d.isoformat(),
+                weekday = d.weekday(),
+                num     = num,
+                start   = st,
+                end     = en,
+                subject = _cl(subj),
+                s_type  = _cl(_txt_first(card, ".type", "[class*='type']")),
+                teacher = _cl(_txt_first(card, ".teacher", "[class*='teacher']", "[class*='professor']")),
+                room    = _cl(_txt_first(card, ".room", ".auditoriya", "[class*='room']")),
+                building= _cl(_txt_first(card, ".building", ".bino", "[class*='build']")),
+            ))
 
     return sorted(lessons, key=lambda l: (l.date, l.num))
 
 
-def _extract_lesson(el, d: date) -> Optional[HemisLesson]:
-    """HTML elementdan dars ma'lumotini olish"""
-    subject = _txt(el,
-        ".subject, .subject-name, .lesson-name, "
-        "[class*='subject'], [data-subject], strong, b"
+def _extract_from_day(day_el, d: date, lessons: list):
+    """Bir kunlik container dan darslarni olish"""
+    cells = day_el.select(
+        ".lesson-cell, .lesson, tr, .time-row, [class*='lesson']"
     )
-    if not subject or len(subject) < 3:
-        return None
-
-    num_str = _txt(el, ".lesson-num, .num, [data-num]") or el.get("data-num", "1")
-    num     = _i(num_str) or 1
-    st, en  = LESSON_TIMES.get(num, ("00:00","00:00"))
-
-    time_str = _txt(el, ".time, .lesson-time, [class*='time']")
-    if time_str:
-        times = re.findall(r"\d{1,2}:\d{2}", time_str)
-        if len(times) >= 2:
-            st, en = times[0], times[1]
-
-    return HemisLesson(
-        date    = d.isoformat(),
-        weekday = d.weekday(),
-        num     = num,
-        start   = st,
-        end     = en,
-        subject = _cl(subject),
-        s_type  = _cl(_txt(el, ".type, .lesson-type, [class*='type']")),
-        teacher = _cl(_txt(el, ".teacher, .instructor, [class*='teacher']")),
-        room    = _cl(_txt(el, ".room, .auditoriya, [class*='room'], [class*='audi']")),
-        building= _cl(_txt(el, ".building, .bino, [class*='build']")),
-    )
-
-
-def _extract_lesson_from_cell(cell, d: date, num: int) -> Optional[HemisLesson]:
-    text = cell.get_text(" ", strip=True)
-    if not text or len(text) < 3:
-        return None
-    st, en = LESSON_TIMES.get(num, ("00:00","00:00"))
-    return HemisLesson(
-        date=d.isoformat(), weekday=d.weekday(), num=num,
-        start=st, end=en, subject=_cl(text[:100]),
-        s_type="", teacher="", room="", building="",
-    )
-
-
-def _parse_schedule_json(data: list, week_start: date) -> list[HemisLesson]:
-    lessons = []
-    for item in data:
-        d_str = item.get("date", item.get("day", ""))
-        num   = _i(str(item.get("lesson_num", item.get("num", 1)))) or 1
+    for cell in cells:
+        num_text = _txt_first(cell, ".num", ".lesson-number", "[class*='num']")
+        num = _i(num_text) or 1
         st, en = LESSON_TIMES.get(num, ("00:00","00:00"))
-        try:
-            d = date.fromisoformat(d_str[:10]) if d_str else week_start
-        except Exception:
-            continue
+
+        subj = _txt_first(cell,
+            ".subject", ".discipline", ".lesson-name",
+            "[class*='subject']", "strong", "b"
+        )
+        if not subj or len(subj) < 3: continue
+
         lessons.append(HemisLesson(
-            date=d.isoformat(), weekday=d.weekday(), num=num,
-            start=st, end=en,
-            subject=_cl(item.get("subject", item.get("name", ""))),
-            s_type =_cl(item.get("type", "")),
-            teacher=_cl(item.get("teacher", "")),
-            room   =_cl(item.get("room", item.get("auditoriya", ""))),
-            building=_cl(item.get("building", "")),
+            date    = d.isoformat(),
+            weekday = d.weekday(),
+            num     = num,
+            start   = st,
+            end     = en,
+            subject = _cl(subj),
+            s_type  = _cl(_txt_first(cell, ".type", "[class*='type']")),
+            teacher = _cl(_txt_first(cell, ".teacher", "[class*='teacher']")),
+            room    = _cl(_txt_first(cell, ".room", ".auditoriya")),
+            building= _cl(_txt_first(cell, ".building", "[class*='build']")),
         ))
-    return lessons
 
 
 # ── Utils ─────────────────────────────────────────────────────
 
-def _cl(t: str) -> str:
-    return re.sub(r"\s+", " ", t or "").strip()
+def _txt_first(el, *selectors) -> str:
+    for sel in selectors:
+        found = el.select_one(sel)
+        if found:
+            return found.get_text(strip=True)
+    return ""
 
-def _txt(el, selector: str) -> str:
-    found = el.select_one(selector)
-    return found.get_text(strip=True) if found else ""
+def _cl(t: str) -> str:
+    return re.sub(r"\s+", " ", str(t or "")).strip()
 
 def _f(t) -> Optional[float]:
     if t is None: return None
-    m = re.search(r"[\d]+[.,]?[\d]*", str(t).replace(",", "."))
-    return float(m.group().replace(",", ".")) if m else None
+    s = str(t).replace(",", ".").strip()
+    m = re.search(r"\d+\.?\d*", s)
+    return float(m.group()) if m else None
 
 def _i(t) -> Optional[int]:
     if t is None: return None
     m = re.search(r"\d+", str(t))
     return int(m.group()) if m else None
-
-def _clamp(v, mn, mx) -> Optional[float]:
-    if v is None: return None
-    return max(mn, min(mx, v))
 
 def _sem() -> str:
     from datetime import datetime
@@ -571,38 +555,41 @@ def _demo_profile() -> HemisProfile:
     return HemisProfile(
         full_name="Demo Talaba", student_id="U2200000",
         group="IQ-22-01", faculty="Iqtisodiyot",
-        semester="2024-2", gpa=3.45,
+        semester="2024-2025 (2-semestr)", gpa=3.45,
         level="Bakalavr", study_form="Kunduzgi",
     )
 
-def _demo_grades() -> list[HemisGrade]:
+def _demo_grades() -> list:
     data = [
-        ("Mikroiqtisodiyot",      "MIK01", 17,24,None, 41,64,4),
-        ("Bank ishi va kredit",   "BNK02", 15,22,None, 37,72,6),
-        ("Iqtisodiy siyosat",     "IQS03", 18,28,None, 46,80,2),
-        ("Pul va kredit",         "PUL04", 12,18,None, 30,64,8),
-        ("Marketing asoslari",    "MRK05", 19,26,None, 45,72,0),
-        ("Tadbirkorlik asoslari", "TDB06", 16,25,None, 41,56,6),
+        ("Mikroiqtisodiyot",      "1", 17, 24, None, 41, 64,  4),
+        ("Bank ishi va kredit",   "2", 15, 22, None, 37, 72,  6),
+        ("Iqtisodiy siyosat",     "3", 18, 28, None, 46, 80,  2),
+        ("Pul va kredit",         "4", 12, 18, None, 30, 64, 14),
+        ("Marketing asoslari",    "5", 19, 26, None, 45, 72,  0),
+        ("Tadbirkorlik asoslari", "6", 16, 25, None, 41, 56,  6),
     ]
-    return [HemisGrade(s,h,c,m,f,t,hr,ms,"2024-2") for s,h,c,m,f,t,hr,ms in data]
+    return [
+        HemisGrade(s, h, c, m, f, t, hr, ms, "2024-2")
+        for s, h, c, m, f, t, hr, ms in data
+    ]
 
-def _demo_schedule(target: date) -> list[HemisLesson]:
+def _demo_schedule(target: date) -> list:
     monday = target - timedelta(days=target.weekday())
     items = [
-        (0,1,"Mikroiqtisodiyot","Ma'ruza", "Salimov B.", "A-301","A blok"),
-        (0,3,"Bank ishi",       "Seminar", "Rahimov N.", "B-204","B blok"),
-        (1,2,"Pul va kredit",   "Ma'ruza", "Hasanov M.", "A-101","A blok"),
-        (1,4,"Marketing",       "Seminar", "Yusupov K.", "C-305","C blok"),
-        (2,1,"Iqtisodiy siyosat","Ma'ruza","Toshmatov A.","A-201","A blok"),
-        (3,2,"Mikroiqtisodiyot","Seminar", "Salimov B.", "B-102","B blok"),
-        (4,3,"Bank ishi",       "Ma'ruza", "Rahimov N.", "A-301","A blok"),
+        (0, 1, "Mikroiqtisodiyot",     "Ma'ruza", "Salimov B.",   "A-301", "A blok"),
+        (0, 3, "Bank ishi",            "Seminar",  "Rahimov N.",   "B-204", "B blok"),
+        (1, 2, "Pul va kredit",        "Ma'ruza", "Hasanov M.",   "A-101", "A blok"),
+        (1, 4, "Marketing",            "Seminar",  "Yusupov K.",   "C-305", "C blok"),
+        (2, 1, "Iqtisodiy siyosat",    "Ma'ruza", "Toshmatov A.", "A-201", "A blok"),
+        (3, 2, "Mikroiqtisodiyot",     "Seminar",  "Salimov B.",   "B-102", "B blok"),
+        (4, 3, "Bank ishi",            "Ma'ruza", "Rahimov N.",   "A-301", "A blok"),
     ]
     result = []
     for di, num, subj, stype, teacher, room, building in items:
         d = monday + timedelta(days=di)
         st, en = LESSON_TIMES[num]
         result.append(HemisLesson(
-            d.isoformat(), d.weekday(), num, st, en,
-            subj, stype, teacher, room, building
+            d.isoformat(), d.weekday(), num,
+            st, en, subj, stype, teacher, room, building
         ))
     return sorted(result, key=lambda l: (l.date, l.num))
