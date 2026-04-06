@@ -1231,6 +1231,19 @@ async def api_schedule(telegram_id: int, week: str = ""):
     return {"week": target.isoformat(), "days": by_date}
 
 
+# ── Login forma inspektori ─────────────────────────────────────
+@app.get("/api/inspect-login")
+async def inspect_login():
+    """
+    talaba.tsue.uz login forma tuzilmasini ko'rish.
+    Brauzerda: https://your-app.railway.app/api/inspect-login
+    """
+    from scraper import HemisScraper
+    async with HemisScraper(0, "", None, demo=False) as sc:
+        info = await sc.inspect_login_form()
+    return info
+
+
 # ── Debug endpoint (faqat development uchun) ──────────────────
 @app.get("/api/debug-hemis/{telegram_id}")
 async def debug_hemis(telegram_id: int, path: str = "/dashboard"):
