@@ -85,6 +85,7 @@ class HemisScraper:
         self._cookies  = cookies or {}
         self._session  = None
         self._base     = config.HEMIS_BASE_URL.rstrip("/")
+        self._saved_form: dict = {}  # fetch_captcha dan saqlangan form data
 
     async def __aenter__(self):
         import ssl as _ssl
@@ -117,6 +118,7 @@ class HemisScraper:
     async def fetch_captcha(self) -> dict:
         """
         Login sahifasidan captcha rasmini qaytaradi.
+        CSRF va form field larni ham saqlaydi.
         {"image": bytes, "field": str} yoki {} (captcha yo'q bo'lsa)
         """
         login_url = self._base + "/dashboard/login"
@@ -124,22 +126,53 @@ class HemisScraper:
             html = await r.text()
         soup = BeautifulSoup(html, "html.parser")
 
+        # CSRF token
+        csrf_name, csrf_token = "_csrf-frontend", ""
+        for inp in soup.find_all("input"):
+            name = inp.get("name", "")
+            if "csrf" in name.lower():
+                csrf_name  = name
+                csrf_token = inp.get("value", "")
+                break
+
+        # Username/password field nomlari
+        username_field = "LoginForm[username]"
+        password_field = "LoginForm[password]"
+        for inp in soup.find_all("input"):
+            n, t, i = inp.get("name",""), inp.get("type",""), inp.get("id","").lower()
+            if t in ("text","email") or "username" in i or "login" in i:
+                if n and "csrf" not in n.lower() and "captcha" not in n.lower():
+                    username_field = n
+            if t == "password" and n:
+                password_field = n
+
+        # Captcha field
         captcha_field = ""
         for inp in soup.find_all("input"):
             name = inp.get("name", "")
-            if any(x in name.lower() for x in ["captcha", "verifycode", "recaptcha"]):
+            if any(x in name.lower() for x in ["captcha","verifycode","recaptcha"]):
                 captcha_field = name
                 break
 
-        if not captcha_field:
-            return {}
-
+        # Captcha rasmini topamiz
         captcha_img_url = ""
         for img in soup.find_all("img"):
             src = img.get("src", "")
-            if any(x in src.lower() for x in ["captcha", "verifycode", "verify"]):
+            if any(x in src.lower() for x in ["captcha","verifycode","verify"]):
                 captcha_img_url = src
                 break
+
+        # Form ma'lumotlarini saqlaymiz (qayta yuklamaslik uchun)
+        self._saved_form = {
+            "csrf_name":      csrf_name,
+            "csrf_token":     csrf_token,
+            "username_field": username_field,
+            "password_field": password_field,
+            "captcha_field":  captcha_field,
+        }
+
+        if not captcha_field:
+            return {}
 
         if not captcha_img_url:
             return {"field": captcha_field, "image": None}
@@ -311,69 +344,60 @@ class HemisScraper:
     async def _login(self, captcha_answer: str = "", attempt: int = 1):
         from crypto import decrypt
         password = decrypt(self._enc_pass)
-
-        # ── Qadam 1: Login sahifasini yuklaymiz ──────────────────
         login_url = self._base + "/dashboard/login"
-        async with self._session.get(login_url, ssl=False) as r:
-            html = await r.text()
 
-        soup = BeautifulSoup(html, "html.parser")
+        # Agar fetch_captcha dan saqlangan form data bo'lsa — qayta yuklamaymiz
+        if self._saved_form and captcha_answer:
+            csrf_name      = self._saved_form.get("csrf_name",  "_csrf-frontend")
+            csrf_token     = self._saved_form.get("csrf_token", "")
+            username_field = self._saved_form.get("username_field", "LoginForm[username]")
+            password_field = self._saved_form.get("password_field", "LoginForm[password]")
+            captcha_field  = self._saved_form.get("captcha_field",  "FormStudentLogin[reCaptcha]")
+        else:
+            # ── Login sahifasini yuklaymiz ──────────────────────────
+            async with self._session.get(login_url, ssl=False) as r:
+                html = await r.text()
+            soup = BeautifulSoup(html, "html.parser")
 
-        # ── Qadam 2: CSRF token ──────────────────────────────────
-        csrf_name  = "_csrf-frontend"
-        csrf_token = ""
+            csrf_name, csrf_token = "_csrf-frontend", ""
+            for inp in soup.find_all("input"):
+                name = inp.get("name", "")
+                if "csrf" in name.lower():
+                    csrf_name  = name
+                    csrf_token = inp.get("value", "")
+                    break
 
-        for inp in soup.find_all("input", {"type": ["hidden", ""]}):
-            name = inp.get("name", "")
-            val  = inp.get("value", "")
-            if "csrf" in name.lower():
-                csrf_name  = name
-                csrf_token = val
-                break
+            username_field = "LoginForm[username]"
+            password_field = "LoginForm[password]"
+            captcha_field  = ""
+            for inp in soup.find_all("input"):
+                n, t, i = inp.get("name",""), inp.get("type",""), inp.get("id","").lower()
+                if t in ("text","email") or "username" in i or "login" in i:
+                    if n and "csrf" not in n.lower() and "captcha" not in n.lower():
+                        username_field = n
+                if t == "password" and n:
+                    password_field = n
+                if any(x in n.lower() for x in ["captcha","verifycode","recaptcha"]):
+                    captcha_field = n
 
-        # ── Qadam 3: Username va password field nomlarini topamiz ─
-        username_field = "LoginForm[username]"
-        password_field = "LoginForm[password]"
-        remember_field = "LoginForm[rememberMe]"
+            # OCR bilan captcha o'qiymiz (fallback)
+            _, captcha_text_ocr = await self._solve_captcha(soup)
+            if captcha_answer:
+                captcha_text_ocr = captcha_answer
+            captcha_answer = captcha_text_ocr
 
-        for inp in soup.find_all("input"):
-            inp_name = inp.get("name", "")
-            inp_type = inp.get("type", "")
-            inp_id   = inp.get("id", "").lower()
-
-            if inp_type in ("text", "email") or "username" in inp_id or "login" in inp_id:
-                if inp_name and "csrf" not in inp_name.lower() and "captcha" not in inp_name.lower():
-                    username_field = inp_name
-
-            if inp_type == "password" and inp_name:
-                password_field = inp_name
-
-        # ── Qadam 4: Captcha ─────────────────────────────────────
-        captcha_field, captcha_text = await self._solve_captcha(soup)
-        # Agar foydalanuvchi o'zi yuborganini ishlatamiz
-        if captcha_answer:
-            captcha_text = captcha_answer
-
-        # ── Qadam 5: Form data yig'amiz ──────────────────────────
+        # ── Form data yig'amiz ──────────────────────────────────────
         form_data = {
             username_field: self.hemis_id,
             password_field: password,
         }
         if csrf_token:
             form_data[csrf_name] = csrf_token
-
-        if captcha_field and captcha_text:
-            form_data[captcha_field] = captcha_text
+        if captcha_field and captcha_answer:
+            form_data[captcha_field] = captcha_answer
 
         # rememberMe
-        for inp in soup.find_all("input", {"type": "checkbox"}):
-            name = inp.get("name", "")
-            if "remember" in name.lower() or "remember" in inp.get("id", "").lower():
-                form_data[name] = inp.get("value", "1")
-                break
-        else:
-            if remember_field not in form_data:
-                form_data[remember_field] = "1"
+        form_data["LoginForm[rememberMe]"] = "1"
 
         async with self._session.post(
             login_url,
@@ -384,7 +408,7 @@ class HemisScraper:
             final_url = str(r.url)
             body      = await r.text()
 
-        # ── Qadam 6: Login natijasini tekshiramiz ────────────────
+        # ── Natijani tekshiramiz ────────────────────────────────────
         if "/dashboard/login" in final_url:
             err_soup = BeautifulSoup(body, "html.parser")
             err_el   = err_soup.select_one(
@@ -393,15 +417,14 @@ class HemisScraper:
             )
             err_msg = err_el.get_text(strip=True) if err_el else ""
 
-            # Captcha xatosi — qayta urinib ko'ramiz (max 4 marta)
             is_captcha_err = any(
                 x in err_msg.lower()
-                for x in ["captcha", "verify", "kod", "tasdiqlash", "tekshir"]
+                for x in ["captcha","verify","kod","tasdiqlash","tekshir"]
             )
-            if is_captcha_err or (captcha_field and not captcha_text):
-                if attempt < 4:
-                    await asyncio.sleep(0.5)
-                    return await self._login(captcha_answer=captcha_answer, attempt=attempt + 1)
+            if is_captcha_err and attempt < 3:
+                self._saved_form = {}  # Yangi captcha olish uchun tozalaymiz
+                await asyncio.sleep(0.5)
+                return await self._login(captcha_answer="", attempt=attempt + 1)
 
             raise HemisAuthError(
                 "Login muvaffaqiyatsiz!\n\n"
