@@ -23,6 +23,7 @@ router = Router()
 class HemisForm(StatesGroup):
     waiting_id       = State()
     waiting_password = State()
+    waiting_captcha  = State()
 
 # ── Klaviaturalar ─────────────────────────────────────────────
 
@@ -370,30 +371,84 @@ async def fsm_id(msg: Message, state: FSMContext):
 async def fsm_password(msg: Message, state: FSMContext):
     password = msg.text or ""
     data     = await state.get_data()
-    hemis_id = data.get("hemis_id","")
+    hemis_id = data.get("hemis_id", "")
     try: await msg.delete()
     except: pass
-    wait = await msg.answer("⏳ Hemis'ga ulanilmoqda...")
+    wait = await msg.answer("⏳ Captcha yuklanmoqda...")
 
     from scraper import HemisScraper, HemisAuthError
     from crypto import encrypt
     enc_pass = encrypt(password)
 
+    # Captcha rasmini olamiz
     try:
         async with HemisScraper(msg.from_user.id, hemis_id, enc_pass) as sc:
-            await sc.ensure_login()
+            captcha_info = await sc.fetch_captcha()
+    except Exception as e:
+        await state.clear()
+        await wait.edit_text(f"❌ Hemis ga ulanib bo'lmadi: {e}\n\nQaytadan /start")
+        return
+
+    if captcha_info and captcha_info.get("image"):
+        # Captcha rasmini yuboramiz
+        import io
+        from aiogram.types import BufferedInputFile
+        img_bytes = captcha_info["image"]
+        await wait.delete()
+        cap_msg = await msg.answer_photo(
+            BufferedInputFile(img_bytes, filename="captcha.png"),
+            caption="🔐 <b>Captcha kiriting:</b>\nRasmdagi matnni yozing:"
+        )
+        await state.update_data(
+            hemis_id=hemis_id,
+            enc_pass=enc_pass,
+            captcha_field=captcha_info.get("field", ""),
+            captcha_msg_id=cap_msg.message_id,
+        )
+        await state.set_state(HemisForm.waiting_captcha)
+    else:
+        # Captcha yo'q — to'g'ridan login
+        await _do_login(msg, state, wait, hemis_id, enc_pass, captcha_text="")
+
+
+@router.message(HemisForm.waiting_captcha)
+async def fsm_captcha(msg: Message, state: FSMContext):
+    captcha_text = msg.text.strip() if msg.text else ""
+    data = await state.get_data()
+    hemis_id     = data.get("hemis_id", "")
+    enc_pass     = data.get("enc_pass", "")
+
+    # Eski captcha rasmini o'chiramiz
+    try:
+        cap_id = data.get("captcha_msg_id")
+        if cap_id:
+            await msg.bot.delete_message(msg.chat.id, cap_id)
+    except: pass
+
+    wait = await msg.answer("⏳ Hemis'ga ulanilmoqda...")
+    await _do_login(msg, state, wait, hemis_id, enc_pass, captcha_text)
+
+
+async def _do_login(msg, state, wait_msg, hemis_id, enc_pass, captcha_text):
+    from scraper import HemisScraper, HemisAuthError
+
+    try:
+        async with HemisScraper(msg.from_user.id, hemis_id, enc_pass) as sc:
+            await sc.ensure_login(captcha_answer=captcha_text)
 
         async with AsyncSessionFactory() as db:
             res  = await db.execute(select(User).where(User.id == msg.from_user.id))
             user = res.scalars().first()
-            if user:
-                user.hemis_id = hemis_id
-                user.hemis_password_enc = enc_pass
-                user.is_demo = False
-                await db.commit()
+            if not user:
+                user = User(id=msg.from_user.id)
+                db.add(user)
+            user.hemis_id = hemis_id
+            user.hemis_password_enc = enc_pass
+            user.is_demo = False
+            await db.commit()
 
         await state.clear()
-        await wait.edit_text(
+        await wait_msg.edit_text(
             "✅ <b>Hemis muvaffaqiyatli ulandi!</b>\n\n"
             "📊 /grades — Baholar\n"
             "📅 /schedule — Bugungi jadval\n"
@@ -402,7 +457,7 @@ async def fsm_password(msg: Message, state: FSMContext):
         )
     except HemisAuthError as e:
         await state.clear()
-        await wait.edit_text("❌ " + str(e) + "\n\nQaytadan /start")
+        await wait_msg.edit_text("❌ " + str(e) + "\n\nQaytadan /start")
     except Exception as e:
         await state.clear()
         await wait.edit_text("❌ Ulanib bo'lmadi: " + str(e))
