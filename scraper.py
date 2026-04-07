@@ -87,9 +87,13 @@ class HemisScraper:
         self._base     = config.HEMIS_BASE_URL.rstrip("/")
 
     async def __aenter__(self):
-        # ssl=False — ba'zi serverlar self-signed sertifikat ishlatadi
-        connector = aiohttp.TCPConnector(ssl=False)
-        timeout   = aiohttp.ClientTimeout(total=30, connect=10)
+        import ssl as _ssl
+        # SSL tekshirishni o'chiramiz + barcha sertifikatlarni qabul qilamiz
+        ssl_ctx = _ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx, limit=10, enable_cleanup_closed=True)
+        timeout   = aiohttp.ClientTimeout(total=45, connect=15, sock_read=30)
         jar       = aiohttp.CookieJar(unsafe=True)
         self._session = aiohttp.ClientSession(
             headers=HEADERS,
@@ -116,7 +120,7 @@ class HemisScraper:
         {"image": bytes, "field": str} yoki {} (captcha yo'q bo'lsa)
         """
         login_url = self._base + "/dashboard/login"
-        async with self._session.get(login_url) as r:
+        async with self._session.get(login_url, ssl=False) as r:
             html = await r.text()
         soup = BeautifulSoup(html, "html.parser")
 
@@ -144,7 +148,7 @@ class HemisScraper:
             captcha_img_url = self._base + captcha_img_url
 
         try:
-            async with self._session.get(captcha_img_url) as r:
+            async with self._session.get(captcha_img_url, ssl=False) as r:
                 img_bytes = await r.read()
             return {"field": captcha_field, "image": img_bytes}
         except Exception:
@@ -194,7 +198,7 @@ class HemisScraper:
         """
         try:
             async with self._session.get(
-                self._base + "/dashboard/login"
+                self._base + "/dashboard/login", ssl=False
             ) as r:
                 html = await r.text()
             soup  = BeautifulSoup(html, "html.parser")
@@ -229,7 +233,7 @@ class HemisScraper:
         try:
             async with self._session.get(
                 self._base + "/dashboard",
-                allow_redirects=False,
+                allow_redirects=False, ssl=False,
             ) as r:
                 loc = r.headers.get("Location","")
                 return r.status == 200 or (r.status in (301,302) and "login" not in loc)
@@ -279,7 +283,7 @@ class HemisScraper:
 
         # Rasmni yuklaymiz
         try:
-            async with self._session.get(captcha_img_url) as r:
+            async with self._session.get(captcha_img_url, ssl=False) as r:
                 img_bytes = await r.read()
         except Exception:
             return captcha_field, ""
@@ -310,7 +314,7 @@ class HemisScraper:
 
         # ── Qadam 1: Login sahifasini yuklaymiz ──────────────────
         login_url = self._base + "/dashboard/login"
-        async with self._session.get(login_url) as r:
+        async with self._session.get(login_url, ssl=False) as r:
             html = await r.text()
 
         soup = BeautifulSoup(html, "html.parser")
@@ -375,6 +379,7 @@ class HemisScraper:
             login_url,
             data=form_data,
             allow_redirects=True,
+            ssl=False,
         ) as r:
             final_url = str(r.url)
             body      = await r.text()
@@ -408,7 +413,7 @@ class HemisScraper:
     async def _get(self, path: str, attempt: int = 1) -> str:
         url = self._base + path
         try:
-            async with self._session.get(url, allow_redirects=True) as r:
+            async with self._session.get(url, allow_redirects=True, ssl=False) as r:
                 if "/dashboard/login" in str(r.url) and attempt == 1:
                     await self._login()
                     return await self._get(path, attempt=2)
