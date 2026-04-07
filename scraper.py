@@ -213,7 +213,7 @@ class HemisScraper:
         for inp in soup.find_all("input"):
             name = inp.get("name", "")
             iid  = inp.get("id", "").lower()
-            if any(x in name.lower() for x in ["captcha", "verifycode", "verify", "code"]):
+            if any(x in name.lower() for x in ["captcha", "verifycode", "verify", "code", "recaptcha"]):
                 captcha_field = name
                 break
             if any(x in iid for x in ["captcha", "verifycode", "verify"]):
