@@ -105,10 +105,50 @@ class HemisScraper:
         if self._session:
             await self._session.close()
 
-    async def ensure_login(self):
+    async def ensure_login(self, captcha_answer: str = ""):
         if self.demo: return
         if await self._valid(): return
-        await self._login()
+        await self._login(captcha_answer=captcha_answer)
+
+    async def fetch_captcha(self) -> dict:
+        """
+        Login sahifasidan captcha rasmini qaytaradi.
+        {"image": bytes, "field": str} yoki {} (captcha yo'q bo'lsa)
+        """
+        login_url = self._base + "/dashboard/login"
+        async with self._session.get(login_url) as r:
+            html = await r.text()
+        soup = BeautifulSoup(html, "html.parser")
+
+        captcha_field = ""
+        for inp in soup.find_all("input"):
+            name = inp.get("name", "")
+            if any(x in name.lower() for x in ["captcha", "verifycode", "recaptcha"]):
+                captcha_field = name
+                break
+
+        if not captcha_field:
+            return {}
+
+        captcha_img_url = ""
+        for img in soup.find_all("img"):
+            src = img.get("src", "")
+            if any(x in src.lower() for x in ["captcha", "verifycode", "verify"]):
+                captcha_img_url = src
+                break
+
+        if not captcha_img_url:
+            return {"field": captcha_field, "image": None}
+
+        if captcha_img_url.startswith("/"):
+            captcha_img_url = self._base + captcha_img_url
+
+        try:
+            async with self._session.get(captcha_img_url) as r:
+                img_bytes = await r.read()
+            return {"field": captcha_field, "image": img_bytes}
+        except Exception:
+            return {"field": captcha_field, "image": None}
 
     async def get_cookies_dict(self) -> dict:
         return {c.key: c.value for c in self._session.cookie_jar}
@@ -213,7 +253,7 @@ class HemisScraper:
         for inp in soup.find_all("input"):
             name = inp.get("name", "")
             iid  = inp.get("id", "").lower()
-            if any(x in name.lower() for x in ["captcha", "verifycode", "verify", "code", "recaptcha"]):
+            if any(x in name.lower() for x in ["captcha", "verifycode", "verify", "code"]):
                 captcha_field = name
                 break
             if any(x in iid for x in ["captcha", "verifycode", "verify"]):
@@ -264,7 +304,7 @@ class HemisScraper:
         except Exception:
             return captcha_field, ""
 
-    async def _login(self, attempt: int = 1):
+    async def _login(self, captcha_answer: str = "", attempt: int = 1):
         from crypto import decrypt
         password = decrypt(self._enc_pass)
 
@@ -306,6 +346,9 @@ class HemisScraper:
 
         # ── Qadam 4: Captcha ─────────────────────────────────────
         captcha_field, captcha_text = await self._solve_captcha(soup)
+        # Agar foydalanuvchi o'zi yuborganini ishlatamiz
+        if captcha_answer:
+            captcha_text = captcha_answer
 
         # ── Qadam 5: Form data yig'amiz ──────────────────────────
         form_data = {
@@ -353,7 +396,7 @@ class HemisScraper:
             if is_captcha_err or (captcha_field and not captcha_text):
                 if attempt < 4:
                     await asyncio.sleep(0.5)
-                    return await self._login(attempt + 1)
+                    return await self._login(captcha_answer=captcha_answer, attempt=attempt + 1)
 
             raise HemisAuthError(
                 "Login muvaffaqiyatsiz!\n\n"
