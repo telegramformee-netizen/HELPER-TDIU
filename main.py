@@ -1107,24 +1107,24 @@ async def api_connect_hemis(body: HemisConnectRequest):
         res = await db.execute(select(User).where(User.id == body.telegram_id))
         user = res.scalars().first()
         if not user:
-                user = User(
-                    id=body.telegram_id,
-                    username=getattr(body, 'username', None),
-                )
-                db.add(user)
-                try:
-                    await db.flush()
-                except Exception:
-                    await db.rollback()
-                    res = await db.execute(select(User).where(User.id == body.telegram_id))
-                    user = res.scalars().first()
+            user = User(
+                id=body.telegram_id,
+                username=getattr(body, 'username', None),
+            )
+            db.add(user)
+            try:
+                await db.flush()
+            except Exception:
+                await db.rollback()
+                res = await db.execute(select(User).where(User.id == body.telegram_id))
+                user = res.scalars().first()
 
-            user.hemis_id = body.hemis_id
-            user.hemis_password_enc = enc_pass
-            user.is_demo = False
-            if profile.full_name and profile.full_name != "Noma'lum":
-                user.full_name = profile.full_name
-            await db.commit()
+        user.hemis_id = body.hemis_id
+        user.hemis_password_enc = enc_pass
+        user.is_demo = False
+        if profile.full_name and profile.full_name != "Noma'lum":
+            user.full_name = profile.full_name
+        await db.commit()
 
     return {
         "success": True,
