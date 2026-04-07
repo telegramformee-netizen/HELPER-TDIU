@@ -77,7 +77,7 @@ class HemisError(Exception): pass
 
 class HemisScraper:
     def __init__(self, user_id, hemis_id, enc_password,
-                 demo=False, cookies=None):
+                 demo=False, cookies=None, saved_form=None):
         self.user_id   = user_id
         self.hemis_id  = hemis_id
         self._enc_pass = enc_password
@@ -85,7 +85,7 @@ class HemisScraper:
         self._cookies  = cookies or {}
         self._session  = None
         self._base     = config.HEMIS_BASE_URL.rstrip("/")
-        self._saved_form: dict = {}  # fetch_captcha dan saqlangan form data
+        self._saved_form: dict = saved_form or {}  # fetch_captcha dan saqlangan form data
 
     async def __aenter__(self):
         import ssl as _ssl
@@ -183,9 +183,9 @@ class HemisScraper:
         try:
             async with self._session.get(captcha_img_url, ssl=False) as r:
                 img_bytes = await r.read()
-            return {"field": captcha_field, "image": img_bytes}
+            return {"field": captcha_field, "image": img_bytes, "saved_form": self._saved_form}
         except Exception:
-            return {"field": captcha_field, "image": None}
+            return {"field": captcha_field, "image": None, "saved_form": self._saved_form}
 
     async def get_cookies_dict(self) -> dict:
         return {c.key: c.value for c in self._session.cookie_jar}
