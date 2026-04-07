@@ -1129,7 +1129,7 @@ let captchaField = '';
 
 async function loadCaptcha(){
   try{
-    const r = await fetch('/api/captcha-image');
+    const r = await fetch(`/api/captcha-image?telegram_id=${TG_ID||0}`);
     if(!r.ok) return;
     const data = await r.json();
     if(data.image_b64){
@@ -1278,6 +1278,11 @@ from scraper import HemisScraper, HemisAuthError
 from analyzer import analyze, risk_text_uz
 from crypto import encrypt, decrypt
 import json as _json
+import base64 as _b64
+import time as _time
+
+# Captcha session store: {telegram_id: {cookies, captcha_field, expires}}
+_LOGIN_SESSIONS: dict = {}
 
 class HemisConnectRequest(BaseModel):
     hemis_id: str
@@ -1297,16 +1302,23 @@ async def api_connect_hemis(body: HemisConnectRequest):
     """
     enc_pass = encrypt(body.password)
 
+    # Saqlangan session cookie'larini olamiz
+    saved = _LOGIN_SESSIONS.get(body.telegram_id, {})
+    saved_cookies = saved.get("cookies", {}) if saved.get("expires", 0) > _time.time() else {}
+
     try:
         async with HemisScraper(
             user_id=body.telegram_id,
             hemis_id=body.hemis_id,
             enc_password=enc_pass,
             demo=False,
+            cookies=saved_cookies,
         ) as sc:
             await sc.ensure_login(captcha_answer=body.captcha_text)
             profile = await sc.fetch_profile()
             cookies = await sc.get_cookies_dict()
+        # Session'ni tozalaymiz
+        _LOGIN_SESSIONS.pop(body.telegram_id, None)
 
     except HemisAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -1468,14 +1480,20 @@ async def api_user_status(telegram_id: int):
 
 
 @app.get("/api/captcha-image")
-async def api_captcha_image():
-    """Login sahifasidan captcha rasmini base64 formatda qaytaradi."""
-    import base64
-    async with HemisScraper(user_id=0, hemis_id="", enc_password="", demo=False) as sc:
+async def api_captcha_image(telegram_id: int = 0):
+    """Login sahifasidan captcha rasmini oladi va session'ni saqlaydi."""
+    async with HemisScraper(user_id=telegram_id, hemis_id="", enc_password="", demo=False) as sc:
         info = await sc.fetch_captcha()
-    if info and info.get("image"):
-        b64 = base64.b64encode(info["image"]).decode()
-        return {"image_b64": b64, "field": info.get("field", "")}
+        if info and info.get("image"):
+            cookies = await sc.get_cookies_dict()
+            # Session'ni saqlaymiz (5 daqiqa amal qiladi)
+            _LOGIN_SESSIONS[telegram_id] = {
+                "cookies": cookies,
+                "captcha_field": info.get("field", "FormStudentLogin[reCaptcha]"),
+                "expires": _time.time() + 300,
+            }
+            b64 = _b64.b64encode(info["image"]).decode()
+            return {"image_b64": b64, "field": info.get("field", "")}
     return {"image_b64": None, "field": ""}
 
 
