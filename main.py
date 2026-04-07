@@ -1092,24 +1092,24 @@ async function boot(){
   TG_ID = tg?.initDataUnsafe?.user?.id || null;
 
   if(!TG_ID){
-    // Browser test uchun
     showLogin();
     return;
   }
 
-  // Foydalanuvchi Hemis ga ulangan-ulangan emasligini tekshiramiz
-  try {
-    const r = await fetch(`${BASE}/api/grades/${TG_ID}`);
-    if(r.status === 401 || r.status === 404){
+  try{
+    const r = await fetch(`${BASE}/api/user-status/${TG_ID}`);
+    const data = await r.json();
+
+    if(!data.has_hemis && !data.is_demo){
+      // Yangi foydalanuvchi yoki Hemis ulanmagan
       showLogin();
       return;
     }
-    if(r.ok){
-      const data = await r.json();
-      if(data.demo){ S.isDemo=true; }
-      if(data.grades) loadRealData(data);
-    }
-  } catch(e){}
+    S.isDemo = data.is_demo;
+  }catch(e){
+    showLogin();
+    return;
+  }
 
   hideLogin();
   initTopbar();
@@ -1452,6 +1452,21 @@ async def api_schedule(telegram_id: int, week: str = ""):
 
 
 # ── Login forma inspektori ─────────────────────────────────────
+@app.get("/api/user-status/{telegram_id}")
+async def api_user_status(telegram_id: int):
+    """Foydalanuvchi Hemis ga ulangan-ulganmasligini qaytaradi."""
+    async with AsyncSessionFactory() as db:
+        res  = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+    if not user:
+        return {"has_hemis": False, "is_demo": False, "exists": False}
+    return {
+        "has_hemis": bool(user.hemis_id and user.hemis_password_enc),
+        "is_demo":   bool(user.is_demo),
+        "exists":    True,
+    }
+
+
 @app.get("/api/captcha-image")
 async def api_captcha_image():
     """Login sahifasidan captcha rasmini base64 formatda qaytaradi."""
