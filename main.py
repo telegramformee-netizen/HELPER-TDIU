@@ -1304,7 +1304,9 @@ async def api_connect_hemis(body: HemisConnectRequest):
 
     # Saqlangan session cookie'larini olamiz
     saved = _LOGIN_SESSIONS.get(body.telegram_id, {})
-    saved_cookies = saved.get("cookies", {}) if saved.get("expires", 0) > _time.time() else {}
+    is_valid = saved.get("expires", 0) > _time.time()
+    saved_cookies = saved.get("cookies", {}) if is_valid else {}
+    saved_form    = saved.get("saved_form", {}) if is_valid else {}
 
     try:
         async with HemisScraper(
@@ -1313,6 +1315,7 @@ async def api_connect_hemis(body: HemisConnectRequest):
             enc_password=enc_pass,
             demo=False,
             cookies=saved_cookies,
+            saved_form=saved_form,
         ) as sc:
             await sc.ensure_login(captcha_answer=body.captcha_text)
             profile = await sc.fetch_profile()
@@ -1488,7 +1491,8 @@ async def api_captcha_image(telegram_id: int = 0):
             cookies = await sc.get_cookies_dict()
             # Session'ni saqlaymiz (5 daqiqa amal qiladi)
             _LOGIN_SESSIONS[telegram_id] = {
-                "cookies": cookies,
+                "cookies":    cookies,
+                "saved_form": info.get("saved_form", {}),
                 "captcha_field": info.get("field", "FormStudentLogin[reCaptcha]"),
                 "expires": _time.time() + 300,
             }
