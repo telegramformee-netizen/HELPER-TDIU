@@ -363,6 +363,62 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   background-size:200% 100%;animation:sk 1.3s infinite;border-radius:12px;
 }
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* LOGIN SCREEN */
+.login-screen{
+  position:fixed;inset:0;z-index:999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;
+}
+.login-logo{
+  width:72px;height:72px;border-radius:20px;
+  background:linear-gradient(135deg,#0a84ff,#5e5ce6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;font-weight:900;color:#fff;
+  box-shadow:0 8px 32px rgba(10,132,255,.4);
+  margin-bottom:20px;
+}
+.login-title{font-size:22px;font-weight:800;margin-bottom:4px;text-align:center}
+.login-sub{font-size:13px;color:var(--t3);margin-bottom:32px;text-align:center}
+.login-field{
+  width:100%;max-width:360px;
+  background:var(--bg3);border:.5px solid var(--sep);
+  border-radius:14px;padding:14px 16px;
+  font-size:16px;color:var(--text);font-family:'Inter',sans-serif;
+  outline:none;margin-bottom:12px;
+  transition:border-color .2s;
+}
+.login-field:focus{border-color:var(--accent)}
+.login-field::placeholder{color:var(--t4)}
+.login-captcha-row{
+  width:100%;max-width:360px;
+  display:flex;gap:10px;align-items:center;margin-bottom:12px;
+}
+.captcha-img{
+  height:48px;border-radius:12px;cursor:pointer;
+  border:.5px solid var(--sep);background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;overflow:hidden;min-width:110px;
+}
+.captcha-img img{height:48px;display:block}
+.login-btn{
+  width:100%;max-width:360px;
+  background:linear-gradient(135deg,#0a84ff,#5e5ce6);
+  border:none;border-radius:14px;
+  padding:16px;font-size:16px;font-weight:700;color:#fff;
+  cursor:pointer;margin-top:4px;
+  transition:opacity .2s;
+}
+.login-btn:active{opacity:.8}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-err{
+  width:100%;max-width:360px;
+  background:rgba(255,69,58,.12);border:.5px solid rgba(255,69,58,.3);
+  border-radius:12px;padding:11px 14px;
+  font-size:13px;color:var(--red);margin-bottom:12px;
+  display:none;
+}
 </style>
 </head>
 <body>
@@ -409,6 +465,30 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 </nav>
 
 <div id="toasts"></div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-logo">H</div>
+  <div class="login-title">HELPER TDIU</div>
+  <div class="login-sub">Hemis tizimiga kiring</div>
+
+  <div id="login-err" class="login-err"></div>
+
+  <input class="login-field" id="lf-id"   type="text"     placeholder="Hemis ID (masalan: 324241104710)" autocomplete="off">
+  <input class="login-field" id="lf-pass" type="password" placeholder="Parol" autocomplete="off">
+
+  <div class="login-captcha-row" id="captcha-row" style="display:none">
+    <div class="captcha-img" id="captcha-img" onclick="reloadCaptcha()" title="Yangilash uchun bosing">
+      <span style="color:var(--t4);font-size:12px;padding:0 8px">Yuklanmoqda...</span>
+    </div>
+    <input class="login-field" id="lf-captcha" type="text" placeholder="Rasmdagi kodni kiriting" style="margin:0;flex:1">
+  </div>
+
+  <button class="login-btn" id="login-btn" onclick="doLogin()">Kirish</button>
+  <div style="margin-top:16px;text-align:center">
+    <span style="font-size:13px;color:var(--t3);cursor:pointer" onclick="doDemo()">👀 Demo rejimda ko'rish</span>
+  </div>
+</div>
 
 <script>
 // ─── Telegram ──────────────────────────────────────────────────
@@ -1005,10 +1085,139 @@ function filterNav(q){
 }
 
 // ─── Boot ─────────────────────────────────────────────
-(function(){
+const BASE = '';
+let TG_ID = null;
+
+async function boot(){
+  TG_ID = tg?.initDataUnsafe?.user?.id || null;
+
+  if(!TG_ID){
+    showLogin();
+    return;
+  }
+
+  try{
+    const r = await fetch(`${BASE}/api/user-status/${TG_ID}`);
+    const data = await r.json();
+
+    if(!data.has_hemis && !data.is_demo){
+      // Yangi foydalanuvchi yoki Hemis ulanmagan
+      showLogin();
+      return;
+    }
+    S.isDemo = data.is_demo;
+  }catch(e){
+    showLogin();
+    return;
+  }
+
+  hideLogin();
   initTopbar();
-  setTimeout(()=>renderHome(), 100);
-})();
+  renderHome();
+}
+
+function showLogin(){
+  document.getElementById('login-screen').style.display='flex';
+  loadCaptcha();
+}
+
+function hideLogin(){
+  document.getElementById('login-screen').style.display='none';
+}
+
+let captchaField = '';
+
+async function loadCaptcha(){
+  try{
+    const r = await fetch(`/api/captcha-image?telegram_id=${TG_ID||0}`);
+    if(!r.ok) return;
+    const data = await r.json();
+    if(data.image_b64){
+      captchaField = data.field || 'FormStudentLogin[reCaptcha]';
+      document.getElementById('captcha-row').style.display='flex';
+      document.getElementById('captcha-img').innerHTML =
+        `<img src="data:image/png;base64,${data.image_b64}" alt="captcha">`;
+    }
+  }catch(e){}
+}
+
+function reloadCaptcha(){
+  document.getElementById('captcha-img').innerHTML =
+    `<span style="color:var(--t4);font-size:12px;padding:0 8px">Yuklanmoqda...</span>`;
+  loadCaptcha();
+}
+
+async function doLogin(){
+  const hemis_id = document.getElementById('lf-id').value.trim();
+  const password = document.getElementById('lf-pass').value;
+  const captcha  = document.getElementById('lf-captcha').value.trim();
+  const errEl    = document.getElementById('login-err');
+  const btn      = document.getElementById('login-btn');
+
+  errEl.style.display='none';
+  if(!hemis_id){ showErr('Hemis ID kiriting'); return; }
+  if(!password){ showErr('Parol kiriting'); return; }
+
+  btn.disabled=true; btn.textContent='Ulanilmoqda...';
+
+  try{
+    const r = await fetch('/api/connect-hemis', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        hemis_id,
+        password,
+        telegram_id: TG_ID || 0,
+        captcha_text: captcha,
+      })
+    });
+    const data = await r.json();
+    if(r.ok && data.success){
+      hideLogin();
+      if(data.profile){
+        D.profile.name    = data.profile.full_name || D.profile.name;
+        D.profile.group   = data.profile.group    || D.profile.group;
+        D.profile.faculty = data.profile.faculty  || D.profile.faculty;
+        D.profile.gpa     = data.profile.gpa      || D.profile.gpa;
+      }
+      S.isDemo = false;
+      initTopbar();
+      renderHome();
+      toast('✅ Hemis ulandi!');
+    } else {
+      const msg = data.detail || 'Login xatosi';
+      showErr(msg);
+      reloadCaptcha();
+      document.getElementById('lf-captcha').value='';
+    }
+  }catch(e){
+    showErr('Ulanishda xatolik: ' + e.message);
+  }finally{
+    btn.disabled=false; btn.textContent='Kirish';
+  }
+}
+
+async function doDemo(){
+  if(!TG_ID){ toast('Demo faqat Telegram ichida'); return; }
+  await fetch('/api/demo', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({telegram_id: TG_ID})
+  });
+  S.isDemo=true;
+  hideLogin();
+  initTopbar();
+  renderHome();
+}
+
+function showErr(msg){
+  const el = document.getElementById('login-err');
+  el.textContent = msg;
+  el.style.display='block';
+}
+
+function loadRealData(data){}
+
+(function(){ boot(); })();
 </script>
 </body>
 </html>"""
@@ -1069,11 +1278,17 @@ from scraper import HemisScraper, HemisAuthError
 from analyzer import analyze, risk_text_uz
 from crypto import encrypt, decrypt
 import json as _json
+import base64 as _b64
+import time as _time
+
+# Captcha session store: {telegram_id: {cookies, captcha_field, expires}}
+_LOGIN_SESSIONS: dict = {}
 
 class HemisConnectRequest(BaseModel):
     hemis_id: str
     password: str
     telegram_id: int
+    captcha_text: str = ""
 
 class DemoRequest(BaseModel):
     telegram_id: int
@@ -1087,16 +1302,26 @@ async def api_connect_hemis(body: HemisConnectRequest):
     """
     enc_pass = encrypt(body.password)
 
+    # Saqlangan session cookie'larini olamiz
+    saved = _LOGIN_SESSIONS.get(body.telegram_id, {})
+    is_valid = saved.get("expires", 0) > _time.time()
+    saved_cookies = saved.get("cookies", {}) if is_valid else {}
+    saved_form    = saved.get("saved_form", {}) if is_valid else {}
+
     try:
         async with HemisScraper(
             user_id=body.telegram_id,
             hemis_id=body.hemis_id,
             enc_password=enc_pass,
             demo=False,
+            cookies=saved_cookies,
+            saved_form=saved_form,
         ) as sc:
-            await sc.ensure_login()
+            await sc.ensure_login(captcha_answer=body.captcha_text)
             profile = await sc.fetch_profile()
             cookies = await sc.get_cookies_dict()
+        # Session'ni tozalaymiz
+        _LOGIN_SESSIONS.pop(body.telegram_id, None)
 
     except HemisAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -1107,8 +1332,18 @@ async def api_connect_hemis(body: HemisConnectRequest):
         res = await db.execute(select(User).where(User.id == body.telegram_id))
         user = res.scalars().first()
         if not user:
-            user = User(id=body.telegram_id)
+            user = User(
+                id=body.telegram_id,
+                username=getattr(body, 'username', None),
+            )
             db.add(user)
+            try:
+                await db.flush()
+            except Exception:
+                await db.rollback()
+                res = await db.execute(select(User).where(User.id == body.telegram_id))
+                user = res.scalars().first()
+
         user.hemis_id = body.hemis_id
         user.hemis_password_enc = enc_pass
         user.is_demo = False
@@ -1231,30 +1466,51 @@ async def api_schedule(telegram_id: int, week: str = ""):
     return {"week": target.isoformat(), "days": by_date}
 
 
-# ── API Inspector ──────────────────────────────────────────────
-@app.get("/api/inspect/{telegram_id}")
-async def inspect_api(telegram_id: int):
-    """
-    Hemis API endpointlarini tekshirish.
-    Brauzerda: https://your-app.railway.app/api/inspect/YOUR_TG_ID
-    """
+# ── Login forma inspektori ─────────────────────────────────────
+@app.get("/api/user-status/{telegram_id}")
+async def api_user_status(telegram_id: int):
+    """Foydalanuvchi Hemis ga ulangan-ulganmasligini qaytaradi."""
     async with AsyncSessionFactory() as db:
         res  = await db.execute(select(User).where(User.id == telegram_id))
         user = res.scalars().first()
+    if not user:
+        return {"has_hemis": False, "is_demo": False, "exists": False}
+    return {
+        "has_hemis": bool(user.hemis_id and user.hemis_password_enc),
+        "is_demo":   bool(user.is_demo),
+        "exists":    True,
+    }
 
-    if not user or not user.hemis_id:
-        return {"error": "Foydalanuvchi topilmadi yoki Hemis ulanmagan"}
 
+@app.get("/api/captcha-image")
+async def api_captcha_image(telegram_id: int = 0):
+    """Login sahifasidan captcha rasmini oladi va session'ni saqlaydi."""
+    async with HemisScraper(user_id=telegram_id, hemis_id="", enc_password="", demo=False) as sc:
+        info = await sc.fetch_captcha()
+        if info and info.get("image"):
+            cookies = await sc.get_cookies_dict()
+            # Session'ni saqlaymiz (5 daqiqa amal qiladi)
+            _LOGIN_SESSIONS[telegram_id] = {
+                "cookies":    cookies,
+                "saved_form": info.get("saved_form", {}),
+                "captcha_field": info.get("field", "FormStudentLogin[reCaptcha]"),
+                "expires": _time.time() + 300,
+            }
+            b64 = _b64.b64encode(info["image"]).decode()
+            return {"image_b64": b64, "field": info.get("field", "")}
+    return {"image_b64": None, "field": ""}
+
+
+@app.get("/api/inspect-login")
+async def inspect_login():
+    """
+    talaba.tsue.uz login forma tuzilmasini ko'rish.
+    Brauzerda: https://your-app.railway.app/api/inspect-login
+    """
     from scraper import HemisScraper
-    async with HemisScraper(
-        telegram_id, user.hemis_id, user.hemis_password_enc, demo=False
-    ) as sc:
-        try:
-            await sc.ensure_login()
-            result = await sc.inspect_api()
-            return {"token": sc._token[:20]+"..." if sc._token else None, "endpoints": result}
-        except Exception as e:
-            return {"error": str(e)}
+    async with HemisScraper(0, "", None, demo=False) as sc:
+        info = await sc.inspect_login_form()
+    return info
 
 
 # ── Debug endpoint (faqat development uchun) ──────────────────
