@@ -1291,9 +1291,39 @@ from crypto import encrypt, decrypt
 import json as _json
 import base64 as _b64
 import time as _time
+import aiohttp as _aiohttp
+import ssl as _ssl
 
-# Captcha session store: {telegram_id: {cookies, captcha_field, expires}}
+# Jonli session store: {telegram_id: {"session": aiohttp.ClientSession, "form": dict, "expires": float}}
+# Session ob'ektini saqlaymiz — cookie'larni emas!
 _LOGIN_SESSIONS: dict = {}
+
+async def _close_old_session(telegram_id: int):
+    """Eski ochiq session'ni yopamiz."""
+    old = _LOGIN_SESSIONS.pop(telegram_id, None)
+    if old and old.get("session"):
+        try:
+            await old["session"].close()
+        except:
+            pass
+
+def _make_session() -> _aiohttp.ClientSession:
+    """Yangi aiohttp session yaratamiz."""
+    ssl_ctx = _ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = _ssl.CERT_NONE
+    connector = _aiohttp.TCPConnector(ssl=ssl_ctx)
+    jar = _aiohttp.CookieJar(unsafe=True)
+    return _aiohttp.ClientSession(
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+            "Accept-Language": "uz-UZ,uz;q=0.9,ru;q=0.8,en;q=0.7",
+        },
+        connector=connector,
+        cookie_jar=jar,
+        timeout=_aiohttp.ClientTimeout(total=30),
+    )
 
 class HemisConnectRequest(BaseModel):
     hemis_id: str
@@ -1308,34 +1338,77 @@ class DemoRequest(BaseModel):
 @app.post("/api/connect-hemis")
 async def api_connect_hemis(body: HemisConnectRequest):
     """
-    Hemis ID va parolni tekshiradi.
-    Saqlangan session bilan captcha va login bir sessionda.
+    Saqlangan JONLI session orqali login qiladi.
+    Session yopilmagan — captcha va login bir sessionda.
     """
-    import asyncio
+    from bs4 import BeautifulSoup
     enc_pass = encrypt(body.password)
 
-    # Saqlangan session cookie va form data
-    saved      = _LOGIN_SESSIONS.pop(body.telegram_id, {})
-    is_valid   = saved.get("expires", 0) > _time.time()
-    saved_cookies  = saved.get("cookies", {})  if is_valid else {}
-    saved_form     = saved.get("saved_form", {}) if is_valid else {}
+    saved = _LOGIN_SESSIONS.pop(body.telegram_id, None)
+
+    if not saved or saved.get("expires", 0) < _time.time():
+        raise HTTPException(status_code=400, detail="Session muddati o'tgan. Captchani qayta yuklang.")
+
+    session       = saved["session"]
+    csrf_name     = saved["csrf_name"]
+    csrf_token    = saved["csrf_token"]
+    username_field= saved["username_field"]
+    password_field= saved["password_field"]
+    captcha_field = saved["captcha_field"]
+    login_url     = saved["login_url"]
 
     try:
-        async with HemisScraper(
-            user_id=body.telegram_id,
-            hemis_id=body.hemis_id,
-            enc_password=enc_pass,
-            demo=False,
-            cookies=saved_cookies,
-            saved_form=saved_form,
-        ) as sc:
-            await sc.ensure_login(captcha_answer=body.captcha_text)
-            profile = await sc.fetch_profile()
-            cookies = await sc.get_cookies_dict()
+        from crypto import decrypt
+        password = decrypt(enc_pass)
+
+        form = {
+            csrf_name:                       csrf_token,
+            username_field:                  body.hemis_id,
+            password_field:                  password,
+            "FormStudentLogin[rememberMe]":  "1",
+            "FormStudentLogin[hasCaptcha]":  "1",
+            captcha_field:                   body.captcha_text,
+        }
+
+        session.headers.update({
+            "Referer": login_url,
+            "Origin":  "https://talaba.tsue.uz",
+        })
+
+        async with session.post(login_url, data=form, allow_redirects=True, ssl=False) as r:
+            final_url = str(r.url)
+            body_text = await r.text()
+
+        if "/dashboard/login" in final_url:
+            soup = BeautifulSoup(body_text, "html.parser")
+            err  = soup.select_one(".alert-danger,.help-block,[class*='error'],[class*='danger']")
+            msg  = err.get_text(strip=True) if err else ""
+            raise HemisAuthError(
+                "Login muvaffaqiyatsiz!\n\n"
+                + (f"Sabab: {msg}\n\n" if msg else "")
+                + "Login yoki parolni tekshiring. Captcha ham to'g'ri bo'lishi kerak."
+            )
+
+        # Login muvaffaqiyatli — profil olish
+        base = "https://talaba.tsue.uz"
+        async with session.get(base + "/dashboard/student-info", ssl=False) as r3:
+            html3 = await r3.text()
+
+        from bs4 import BeautifulSoup as BS
+        from scraper import _parse_profile
+        profile = _parse_profile(html3)
+
     except HemisAuthError as e:
+        await session.close()
         raise HTTPException(status_code=401, detail=str(e))
+    except HTTPException:
+        await session.close()
+        raise
     except Exception as e:
+        await session.close()
         raise HTTPException(status_code=503, detail=f"Hemis ga ulanib bolmadi: {e}")
+
+    await session.close()
 
     async with AsyncSessionFactory() as db:
         res = await db.execute(select(User).where(User.id == body.telegram_id))
@@ -1493,19 +1566,78 @@ async def api_user_status(telegram_id: int):
 
 @app.get("/api/captcha-image")
 async def api_captcha_image(telegram_id: int = 0):
-    """Login sahifasidan captcha rasmini oladi va session'ni saqlaydi."""
-    async with HemisScraper(user_id=telegram_id, hemis_id="", enc_password="", demo=False) as sc:
-        info = await sc.fetch_captcha()
-        if info and info.get("image"):
-            cookies = {k: v for k, v in (await sc.get_cookies_dict()).items()}
-            _LOGIN_SESSIONS[telegram_id] = {
-                "cookies":    cookies,
-                "saved_form": info.get("saved_form", {}),
-                "expires":    _time.time() + 600,  # 10 daqiqa
-            }
-            b64 = _b64.b64encode(info["image"]).decode()
-            return {"image_b64": b64, "field": info.get("field", "")}
-    return {"image_b64": None, "field": ""}
+    """
+    Login sahifasini ochadi, captcha rasmini qaytaradi.
+    Session OCHIQ qoladi — connect-hemis shu sessionni ishlatadi.
+    """
+    from bs4 import BeautifulSoup
+    base = "https://talaba.tsue.uz"
+    login_url = base + "/dashboard/login"
+
+    # Eski session'ni yopamiz
+    await _close_old_session(telegram_id)
+
+    session = _make_session()
+    try:
+        # Login sahifasini yuklaymiz
+        async with session.get(login_url, ssl=False) as r:
+            html = await r.text()
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        # CSRF
+        csrf_name, csrf_token = "_csrf-frontend", ""
+        for inp in soup.find_all("input"):
+            if "csrf" in inp.get("name", "").lower():
+                csrf_name  = inp["name"]
+                csrf_token = inp.get("value", "")
+                break
+
+        # Field nomlar
+        username_field = "FormStudentLogin[login]"
+        password_field = "FormStudentLogin[password]"
+        captcha_field  = "FormStudentLogin[reCaptcha]"
+        for inp in soup.find_all("input"):
+            n, t = inp.get("name",""), inp.get("type","")
+            if t in ("text","email") and n and "csrf" not in n.lower() and "captcha" not in n.lower():
+                username_field = n
+            if t == "password" and n:
+                password_field = n
+            if any(x in n.lower() for x in ["captcha","recaptcha","verifycode"]):
+                captcha_field = n
+
+        # Captcha rasmini yuklaymiz — SAME SESSION
+        img_bytes = None
+        for img in soup.find_all("img"):
+            src = img.get("src","")
+            if any(x in src.lower() for x in ["captcha","verify"]):
+                img_url = (base + src) if src.startswith("/") else src
+                async with session.get(img_url, ssl=False) as ir:
+                    img_bytes = await ir.read()
+                break
+
+        if not img_bytes:
+            await session.close()
+            return {"image_b64": None, "field": ""}
+
+        # Session'ni OCHIQ saqlaymiz (yopmaymiz!)
+        _LOGIN_SESSIONS[telegram_id] = {
+            "session":        session,
+            "csrf_name":      csrf_name,
+            "csrf_token":     csrf_token,
+            "username_field": username_field,
+            "password_field": password_field,
+            "captcha_field":  captcha_field,
+            "login_url":      login_url,
+            "expires":        _time.time() + 600,
+        }
+
+        b64 = _b64.b64encode(img_bytes).decode()
+        return {"image_b64": b64, "field": captcha_field}
+
+    except Exception as e:
+        await session.close()
+        return {"image_b64": None, "field": "", "error": str(e)}
 
 
 @app.get("/api/inspect-login")
