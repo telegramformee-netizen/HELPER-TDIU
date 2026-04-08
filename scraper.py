@@ -136,8 +136,8 @@ class HemisScraper:
                 break
 
         # Username/password field nomlari
-        username_field = "LoginForm[username]"
-        password_field = "LoginForm[password]"
+        username_field = "FormStudentLogin[login]"
+        password_field = "FormStudentLogin[password]"
         for inp in soup.find_all("input"):
             n, t, i = inp.get("name",""), inp.get("type",""), inp.get("id","").lower()
             if t in ("text","email") or "username" in i or "login" in i:
@@ -350,8 +350,8 @@ class HemisScraper:
         if self._saved_form and captcha_answer:
             csrf_name      = self._saved_form.get("csrf_name",  "_csrf-frontend")
             csrf_token     = self._saved_form.get("csrf_token", "")
-            username_field = self._saved_form.get("username_field", "LoginForm[username]")
-            password_field = self._saved_form.get("password_field", "LoginForm[password]")
+            username_field = self._saved_form.get("username_field", "FormStudentLogin[login]")
+            password_field = self._saved_form.get("password_field", "FormStudentLogin[password]")
             captcha_field  = self._saved_form.get("captcha_field",  "FormStudentLogin[reCaptcha]")
         else:
             # ── Login sahifasini yuklaymiz ──────────────────────────
@@ -367,8 +367,8 @@ class HemisScraper:
                     csrf_token = inp.get("value", "")
                     break
 
-            username_field = "LoginForm[username]"
-            password_field = "LoginForm[password]"
+            username_field = "FormStudentLogin[login]"
+            password_field = "FormStudentLogin[password]"
             captcha_field  = ""
             for inp in soup.find_all("input"):
                 n, t, i = inp.get("name",""), inp.get("type",""), inp.get("id","").lower()
@@ -397,7 +397,7 @@ class HemisScraper:
             form_data[captcha_field] = captcha_answer
 
         # rememberMe
-        form_data["LoginForm[rememberMe]"] = "1"
+        form_data["FormStudentLogin[rememberMe]"] = "1"
 
         async with self._session.post(
             login_url,
