@@ -193,6 +193,9 @@ class HemisScraper:
     async def fetch_profile(self) -> HemisProfile:
         if self.demo: return _demo_profile()
         html = await self._get("/dashboard/student-info")
+        print("\n=== DEBUG: student-info HTML (500 belgi) ===")
+        print(html[:500])
+        print("============================================\n")
         return _parse_profile(html)
 
     async def fetch_grades(self, semester_id: str = "") -> list:
@@ -201,6 +204,9 @@ class HemisScraper:
         if semester_id:
             path += f"?_semester_id={semester_id}"
         html = await self._get(path)
+        print("\n=== DEBUG: performance HTML (500 belgi) ===")
+        print(html[:500])
+        print("===========================================\n")
         return _parse_grades(html)
 
     async def fetch_semesters(self) -> list:
@@ -218,6 +224,9 @@ class HemisScraper:
         td     = target or date.today()
         monday = td - timedelta(days=td.weekday())
         html   = await self._get(f"/student/time-table?week={monday.isoformat()}")
+        print("\n=== DEBUG: timetable HTML (500 belgi) ===")
+        print(html[:500])
+        print("=========================================\n")
         return _parse_schedule(html, monday)
 
     async def fetch_raw_html(self, path: str) -> str:
@@ -466,6 +475,12 @@ def _parse_profile(html: str) -> HemisProfile:
             val = cells[1].get_text(strip=True)
             info[key] = val
 
+    # DEBUG
+    print("\n=== DEBUG _parse_profile ===")
+    for k, v in info.items():
+        print(f"  {repr(k)} => {repr(v)}")
+    print("============================\n")
+
     def fv(*keys):
         for k in keys:
             for ik, iv in info.items():
@@ -496,6 +511,7 @@ def _parse_profile(html: str) -> HemisProfile:
                 gpa = v
                 break
 
+    print(f"=== DEBUG natija: {full_name} | {group} | {gpa} ===\n")
     return HemisProfile(
         full_name=full_name or "Noma'lum",
         student_id=student_id,
