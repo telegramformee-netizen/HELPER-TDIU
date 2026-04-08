@@ -474,8 +474,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 
   <div id="login-err" class="login-err"></div>
 
-  <input class="login-field" id="lf-id"   type="text"     placeholder="Hemis ID (masalan: 324241104710)" autocomplete="off">
-  <input class="login-field" id="lf-pass" type="password" placeholder="Parol" autocomplete="off">
+  <input class="login-field" id="lf-id" type="text" placeholder="Hemis ID (masalan: 324241104710)" autocomplete="off">
+  
+  <div style="position:relative;width:100%;max-width:360px;margin-bottom:12px">
+    <input class="login-field" id="lf-pass" type="password" placeholder="Parol" autocomplete="off" style="margin:0;width:100%;padding-right:48px">
+    <button onclick="togglePass()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:20px;color:var(--t3);padding:0;line-height:1" id="eye-btn">👁</button>
+  </div>
 
   <div class="login-captcha-row" id="captcha-row" style="display:none">
     <div class="captcha-img" id="captcha-img" onclick="reloadCaptcha()" title="Yangilash uchun bosing">
@@ -1209,6 +1213,13 @@ async function doDemo(){
   renderHome();
 }
 
+function togglePass(){
+  const f = document.getElementById('lf-pass');
+  const b = document.getElementById('eye-btn');
+  if(f.type === 'password'){ f.type = 'text';  b.textContent = '🙈'; }
+  else                      { f.type = 'password'; b.textContent = '👁'; }
+}
+
 function showErr(msg){
   const el = document.getElementById('login-err');
   el.textContent = msg;
@@ -1298,15 +1309,16 @@ class DemoRequest(BaseModel):
 async def api_connect_hemis(body: HemisConnectRequest):
     """
     Hemis ID va parolni tekshiradi.
-    Muvaffaqiyatli bo'lsa DB ga saqlaydi.
+    Saqlangan session bilan captcha va login bir sessionda.
     """
+    import asyncio
     enc_pass = encrypt(body.password)
 
-    # Saqlangan session cookie'larini olamiz
-    saved = _LOGIN_SESSIONS.get(body.telegram_id, {})
-    is_valid = saved.get("expires", 0) > _time.time()
-    saved_cookies = saved.get("cookies", {}) if is_valid else {}
-    saved_form    = saved.get("saved_form", {}) if is_valid else {}
+    # Saqlangan session cookie va form data
+    saved      = _LOGIN_SESSIONS.pop(body.telegram_id, {})
+    is_valid   = saved.get("expires", 0) > _time.time()
+    saved_cookies  = saved.get("cookies", {})  if is_valid else {}
+    saved_form     = saved.get("saved_form", {}) if is_valid else {}
 
     try:
         async with HemisScraper(
@@ -1320,9 +1332,6 @@ async def api_connect_hemis(body: HemisConnectRequest):
             await sc.ensure_login(captcha_answer=body.captcha_text)
             profile = await sc.fetch_profile()
             cookies = await sc.get_cookies_dict()
-        # Session'ni tozalaymiz
-        _LOGIN_SESSIONS.pop(body.telegram_id, None)
-
     except HemisAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
@@ -1488,13 +1497,11 @@ async def api_captcha_image(telegram_id: int = 0):
     async with HemisScraper(user_id=telegram_id, hemis_id="", enc_password="", demo=False) as sc:
         info = await sc.fetch_captcha()
         if info and info.get("image"):
-            cookies = await sc.get_cookies_dict()
-            # Session'ni saqlaymiz (5 daqiqa amal qiladi)
+            cookies = {k: v for k, v in (await sc.get_cookies_dict()).items()}
             _LOGIN_SESSIONS[telegram_id] = {
                 "cookies":    cookies,
                 "saved_form": info.get("saved_form", {}),
-                "captcha_field": info.get("field", "FormStudentLogin[reCaptcha]"),
-                "expires": _time.time() + 300,
+                "expires":    _time.time() + 600,  # 10 daqiqa
             }
             b64 = _b64.b64encode(info["image"]).decode()
             return {"image_b64": b64, "field": info.get("field", "")}
