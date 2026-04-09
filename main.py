@@ -1520,10 +1520,19 @@ async def api_grades(telegram_id: int, semester: str = ""):
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
 
+    # Saqlangan cookies ni olamiz
+    import json as _js
+    saved_cookies = {}
+    if getattr(user, 'hemis_cookies_enc', None):
+        try:
+            saved_cookies = _js.loads(user.hemis_cookies_enc)
+        except:
+            saved_cookies = {}
+
     try:
         async with HemisScraper(
             telegram_id, user.hemis_id, user.hemis_password_enc,
-            demo=user.is_demo
+            demo=user.is_demo, cookies=saved_cookies
         ) as sc:
             await sc.ensure_login()
             grades    = await sc.fetch_grades(semester)
@@ -1713,6 +1722,30 @@ async def inspect_login():
 
 
 # ── Debug endpoint (faqat development uchun) ──────────────────
+@app.post("/api/save-cookies")
+async def api_save_cookies(data: dict):
+    """
+    Muvaffaqiyatli login cookies ni saqlaydi.
+    scraper_curl4.py dan olingan cookies ni shu yerga yuborish kerak.
+    """
+    telegram_id = data.get("telegram_id")
+    cookies     = data.get("cookies", {})
+    if not telegram_id or not cookies:
+        raise HTTPException(status_code=400, detail="telegram_id va cookies kerak")
+
+    async with AsyncSessionFactory() as db:
+        res  = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+        # Cookies ni JSON sifatida saqlaymiz
+        import json as _js
+        user.hemis_cookies_enc = _js.dumps(cookies)
+        await db.commit()
+
+    return {"success": True, "saved": list(cookies.keys())}
+
+
 @app.get("/api/debug-hemis/{telegram_id}")
 async def debug_hemis(telegram_id: int, path: str = "/dashboard"):
     """
