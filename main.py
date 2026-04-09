@@ -1511,63 +1511,124 @@ async def api_demo(body: DemoRequest):
     return {"success": True}
 
 
-@app.get("/api/grades/{telegram_id}")
-async def api_grades(telegram_id: int, semester: str = ""):
+@app.post("/api/sync-data")
+async def api_sync_data(body: dict):
+    """
+    local_sync.py dan keladigan ma'lumotlarni DB ga saqlaydi.
+    Kompyuterda scraper ishlab, Railway ga yuboradi.
+    """
+    from database import Grade, Schedule
+    from sqlalchemy import delete
+
+    telegram_id = body.get("telegram_id")
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="telegram_id kerak")
+
     async with AsyncSessionFactory() as db:
-        res = await db.execute(select(User).where(User.id == telegram_id))
+        # Foydalanuvchini topamiz yoki yaratamiz
+        res  = await db.execute(select(User).where(User.id == telegram_id))
         user = res.scalars().first()
+        if not user:
+            user = User(id=telegram_id)
+            db.add(user)
 
-    if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+        # Profil
+        profile = body.get("profile", {})
+        if profile.get("full_name"):
+            user.full_name = profile["full_name"]
+        if profile.get("hemis_id"):
+            user.hemis_id = profile["hemis_id"]
+        user.is_demo = False
 
-    # Saqlangan cookies ni olamiz
-    import json as _js
-    saved_cookies = {}
-    if getattr(user, 'hemis_cookies_enc', None):
-        try:
-            saved_cookies = _js.loads(user.hemis_cookies_enc)
-        except:
-            saved_cookies = {}
+        # Baholar — avval o'chiramiz, keyin yangisini qo'shamiz
+        grades = body.get("grades", [])
+        if grades:
+            await db.execute(delete(Grade).where(Grade.user_id == telegram_id))
+            for g in grades:
+                db.add(Grade(
+                    user_id        = telegram_id,
+                    subject_name   = g.get("subject", ""),
+                    subject_hemis_id = g.get("hemis_id", ""),
+                    current_score  = g.get("current"),
+                    midterm_score  = g.get("midterm"),
+                    final_score    = g.get("final"),
+                    total_score    = g.get("total"),
+                    total_hours    = g.get("total_hours"),
+                    missed_hours   = g.get("missed", 0),
+                    fail_risk      = g.get("fail_risk", False),
+                    needed_final   = g.get("needed_final"),
+                    semester       = g.get("semester", ""),
+                ))
 
-    try:
-        async with HemisScraper(
-            telegram_id, user.hemis_id, user.hemis_password_enc,
-            demo=user.is_demo, cookies=saved_cookies
-        ) as sc:
-            await sc.ensure_login()
-            grades    = await sc.fetch_grades(semester)
-            semesters = await sc.fetch_semesters()
-            profile   = await sc.fetch_profile()
-    except HemisAuthError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # Jadval
+        schedule = body.get("schedule", [])
+        if schedule:
+            await db.execute(delete(Schedule).where(Schedule.user_id == telegram_id))
+            for s in schedule:
+                db.add(Schedule(
+                    user_id      = telegram_id,
+                    date         = s.get("date", ""),
+                    lesson_num   = s.get("num", 1),
+                    start_time   = s.get("start", ""),
+                    end_time     = s.get("end", ""),
+                    subject      = s.get("subject", ""),
+                    subject_type = s.get("s_type", ""),
+                    teacher      = s.get("teacher", ""),
+                    room         = s.get("room", ""),
+                    building     = s.get("building", ""),
+                ))
 
-    analyses = [analyze(g.subject, g.current, g.midterm, g.final,
-                        g.total_hours, g.missed, g.semester) for g in grades]
-    gpa_sum = sum(a.total for a in analyses if a.total) or 0
-    gpa_cnt = sum(1 for a in analyses if a.total)
+        await db.commit()
 
     return {
-        "gpa": round(gpa_sum / gpa_cnt / 25, 2) if gpa_cnt else None,
+        "success":    True,
+        "grades":     len(grades),
+        "schedule":   len(schedule),
+        "profile":    profile.get("full_name", ""),
+    }
+
+
+@app.get("/api/grades/{telegram_id}")
+async def api_grades(telegram_id: int, semester: str = ""):
+    """DB dan baholarni o'qiydi — scraperga murojaat qilmaydi."""
+    from database import Grade
+    async with AsyncSessionFactory() as db:
+        res  = await db.execute(select(User).where(User.id == telegram_id))
+        user = res.scalars().first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+        q = select(Grade).where(Grade.user_id == telegram_id)
+        if semester:
+            q = q.where(Grade.semester == semester)
+        res2   = await db.execute(q)
+        grades = res2.scalars().all()
+
+    analyses = [analyze(g.subject_name, g.current_score, g.midterm_score,
+                        g.final_score, g.total_hours, g.missed_hours,
+                        g.semester) for g in grades]
+    gpa_vals = [a.total for a in analyses if a.total]
+    gpa = round(sum(gpa_vals) / len(gpa_vals) / 25, 2) if gpa_vals else None
+
+    return {
+        "gpa":      gpa,
         "semester": semester,
-        "semesters": semesters,
         "profile": {
-            "full_name": profile.full_name,
-            "group":     profile.group,
-            "faculty":   profile.faculty,
-            "semester":  profile.semester,
-            "gpa":       profile.gpa,
+            "full_name": user.full_name or "",
+            "group":     "",
+            "faculty":   "",
+            "semester":  "",
+            "gpa":       gpa,
         },
         "grades": [
             {
-                "subject":      g.subject,
-                "current":      g.current,
-                "midterm":      g.midterm,
-                "final":        g.final,
+                "subject":      g.subject_name,
+                "current":      g.current_score,
+                "midterm":      g.midterm_score,
+                "final":        g.final_score,
                 "total":        a.total,
                 "total_hours":  g.total_hours,
-                "missed":       g.missed,
+                "missed":       g.missed_hours,
                 "fail_risk":    a.fail_risk,
                 "nb_warning":   a.nb_warning,
                 "needed_final": a.needed_final,
@@ -1575,10 +1636,8 @@ async def api_grades(telegram_id: int, semester: str = ""):
                 "letter":       a.letter,
             }
             for g, a in zip(grades, analyses)
-        ]
+        ],
     }
-
-
 @app.get("/api/schedule/{telegram_id}")
 async def api_schedule(telegram_id: int, week: str = ""):
     async with AsyncSessionFactory() as db:
