@@ -1100,22 +1100,39 @@ async function boot(){
     return;
   }
 
+  // Foydalanuvchi statusini tekshiramiz
+  let status;
   try{
     const r = await fetch(`${BASE}/api/user-status/${TG_ID}`);
-    const data = await r.json();
-
-    if(!data.has_hemis && !data.is_demo){
-      // Yangi foydalanuvchi yoki Hemis ulanmagan
-      showLogin();
-      return;
-    }
-    S.isDemo = data.is_demo;
+    status = await r.json();
   }catch(e){
     showLogin();
     return;
   }
 
+  if(!status.has_hemis && !status.is_demo){
+    showLogin();
+    return;
+  }
+
+  S.isDemo = status.is_demo;
   hideLogin();
+
+  // Loading ko'rsatamiz
+  document.getElementById('home-inner').innerHTML =
+    '<div style="padding:40px;text-align:center;color:var(--t3)">⏳ Ma\'lumotlar yuklanmoqda...</div>';
+
+  // Real ma'lumotlarni yuklaymiz
+  try{
+    const gr = await fetch(`${BASE}/api/grades/${TG_ID}`);
+    if(gr.ok){
+      const data = await gr.json();
+      loadRealData(data);
+    }
+  }catch(e){
+    console.error('Grades error:', e);
+  }
+
   initTopbar();
   renderHome();
 }
@@ -1226,7 +1243,42 @@ function showErr(msg){
   el.style.display='block';
 }
 
-function loadRealData(data){}
+function loadRealData(data){
+  if(!data) return;
+
+  // GPA
+  if(data.gpa != null) D.profile.gpa = data.gpa;
+
+  // Semestrlar
+  if(data.semesters && data.semesters.length > 0){
+    const active = data.semesters.find(s=>s.active) || data.semesters[0];
+    D.profile.sem = active.label || active.id || D.profile.sem;
+  }
+
+  // Baholar
+  if(data.grades && data.grades.length > 0){
+    D.grades = data.grades.map(g => ({
+      s:    g.subject    || '',
+      cur:  g.current    ?? null,
+      mid:  g.midterm    ?? null,
+      fin:  g.final      ?? null,
+      tot:  g.total      ?? 0,
+      hrs:  g.total_hours ?? 0,
+      miss: g.missed      ?? 0,
+      risk: g.fail_risk   ?? false,
+      nb:   g.nb_warning  ?? false,
+      need: g.needed_final ?? null,
+    }));
+  }
+
+  // Profil (agar /api/profile endpointi bo'lsa)
+  if(data.profile){
+    if(data.profile.full_name) D.profile.name    = data.profile.full_name;
+    if(data.profile.group)     D.profile.group   = data.profile.group;
+    if(data.profile.faculty)   D.profile.faculty = data.profile.faculty;
+    if(data.profile.gpa)       D.profile.gpa     = data.profile.gpa;
+  }
+}
 
 (function(){ boot(); })();
 </script>
@@ -1474,8 +1526,9 @@ async def api_grades(telegram_id: int, semester: str = ""):
             demo=user.is_demo
         ) as sc:
             await sc.ensure_login()
-            grades   = await sc.fetch_grades(semester)
+            grades    = await sc.fetch_grades(semester)
             semesters = await sc.fetch_semesters()
+            profile   = await sc.fetch_profile()
     except HemisAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
@@ -1490,6 +1543,13 @@ async def api_grades(telegram_id: int, semester: str = ""):
         "gpa": round(gpa_sum / gpa_cnt / 25, 2) if gpa_cnt else None,
         "semester": semester,
         "semesters": semesters,
+        "profile": {
+            "full_name": profile.full_name,
+            "group":     profile.group,
+            "faculty":   profile.faculty,
+            "semester":  profile.semester,
+            "gpa":       profile.gpa,
+        },
         "grades": [
             {
                 "subject":      g.subject,
