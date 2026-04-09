@@ -1759,33 +1759,40 @@ async def debug_hemis(telegram_id: int, path: str = "/dashboard"):
     if not user or not user.hemis_id:
         return {"error": "Foydalanuvchi yoki Hemis ID topilmadi"}
 
+    # Saqlangan cookies
+    import json as _js
+    saved_cookies = {}
+    if getattr(user, 'hemis_cookies_enc', None):
+        try:
+            saved_cookies = _js.loads(user.hemis_cookies_enc)
+        except:
+            pass
+
     try:
         async with HemisScraper(
-            telegram_id, user.hemis_id, user.hemis_password_enc, demo=False
+            telegram_id, user.hemis_id, user.hemis_password_enc,
+            demo=False, cookies=saved_cookies
         ) as sc:
             await sc.ensure_login()
             html = await sc.fetch_raw_html(path)
 
-        # HTML ni analiz qilamiz
         soup = BeautifulSoup(html, "html.parser")
         from fastapi.responses import JSONResponse
 
         tables = []
         for t in soup.find_all("table")[:5]:
             rows = []
-            for row in t.find_all("tr")[:5]:
-                rows.append([td.get_text(strip=True)[:50] for td in row.find_all(["td","th"])])
+            for row in t.find_all("tr")[:10]:
+                rows.append([td.get_text(strip=True)[:80] for td in row.find_all(["td","th"])])
             tables.append(rows)
 
         return JSONResponse({
-            "url_fetched": path,
-            "title": soup.title.string if soup.title else "",
-            "headings": [h.get_text(strip=True) for h in soup.find_all(["h1","h2","h3"])[:10]],
-            "tables_found": len(soup.find_all("table")),
-            "table_preview": tables,
-            "forms": [{"action": f.get("action"), "fields": [i.get("name") for i in f.find_all("input")]}
-                      for f in soup.find_all("form")[:3]],
-            "raw_html_snippet": html[:3000],
+            "url_fetched":    path,
+            "title":          soup.title.string if soup.title else "",
+            "headings":       [h.get_text(strip=True) for h in soup.find_all(["h1","h2","h3","h4"])[:10]],
+            "tables_found":   len(soup.find_all("table")),
+            "table_preview":  tables,
+            "raw_html_snippet": html[:5000],
         })
     except Exception as e:
         return {"error": str(e)}
