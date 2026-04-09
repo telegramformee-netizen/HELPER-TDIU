@@ -194,9 +194,14 @@ class HemisScraper:
         if self.demo: return _demo_profile()
         html = await self._get("/dashboard/student-info")
         print("\n=== DEBUG: student-info HTML (500 belgi) ===")
-        print(html[:500])
+        print(html[:3000])
         print("============================================\n")
-        return _parse_profile(html)
+        profile = _parse_profile(html)
+        if not profile.full_name or profile.full_name == "Noma'lum":
+            print("\n=== DEBUG: To'liq HTML (ism topilmadi) ===")
+            print(html[:5000])
+            print("===========================================\n")
+        return profile
 
     async def fetch_grades(self, semester_id: str = "") -> list:
         if self.demo: return _demo_grades()
@@ -205,7 +210,7 @@ class HemisScraper:
             path += f"?_semester_id={semester_id}"
         html = await self._get(path)
         print("\n=== DEBUG: performance HTML (500 belgi) ===")
-        print(html[:500])
+        print(html[:3000])
         print("===========================================\n")
         return _parse_grades(html)
 
@@ -225,7 +230,7 @@ class HemisScraper:
         monday = td - timedelta(days=td.weekday())
         html   = await self._get(f"/student/time-table?week={monday.isoformat()}")
         print("\n=== DEBUG: timetable HTML (500 belgi) ===")
-        print(html[:500])
+        print(html[:3000])
         print("=========================================\n")
         return _parse_schedule(html, monday)
 
