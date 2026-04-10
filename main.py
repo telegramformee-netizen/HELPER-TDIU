@@ -1538,28 +1538,27 @@ async def api_sync_data(body: dict):
             user.full_name = profile["full_name"]
         if profile.get("hemis_id"):
             user.hemis_id = profile["hemis_id"]
-        if profile.get("gpa"):
-            user.gpa_cache = profile["gpa"]
         user.is_demo = False
 
         # Baholar — avval o'chiramiz, keyin yangisini qo'shamiz
         grades = body.get("grades", [])
         if grades:
             await db.execute(delete(Grade).where(Grade.user_id == telegram_id))
+            await db.flush()
             for g in grades:
                 db.add(Grade(
-                    user_id        = telegram_id,
-                    subject_name   = g.get("subject", ""),
-                    subject_hemis_id = g.get("hemis_id", ""),
-                    current_score  = g.get("current"),
-                    midterm_score  = g.get("midterm"),
-                    final_score    = g.get("final"),
-                    total_score    = g.get("total"),
-                    total_hours    = g.get("total_hours"),
-                    missed_hours   = g.get("missed", 0),
-                    fail_risk      = g.get("fail_risk", False),
-                    needed_final   = g.get("needed_final"),
-                    semester       = g.get("semester", ""),
+                    user_id          = telegram_id,
+                    subject_name     = g.get("subject", "")[:255],
+                    subject_hemis_id = str(g.get("hemis_id", ""))[:63],
+                    current_score    = g.get("current"),
+                    midterm_score    = g.get("midterm"),
+                    final_score      = g.get("final"),
+                    total_score      = g.get("total"),
+                    total_hours      = g.get("total_hours"),
+                    missed_hours     = g.get("missed") or 0,
+                    fail_risk        = bool(g.get("fail_risk", False)),
+                    needed_final     = g.get("needed_final"),
+                    semester         = str(g.get("semester", ""))[:15],
                 ))
 
         # Jadval
