@@ -1538,6 +1538,8 @@ async def api_sync_data(body: dict):
             user.full_name = profile["full_name"]
         if profile.get("hemis_id"):
             user.hemis_id = profile["hemis_id"]
+        if profile.get("gpa"):
+            user.gpa_cache = profile["gpa"]
         user.is_demo = False
 
         # Baholar — avval o'chiramiz, keyin yangisini qo'shamiz
